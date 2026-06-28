@@ -116,26 +116,23 @@ export default function PipelinePage() {
     <AppShell>
       <h1 className="text-2xl font-semibold tracking-tight">Pipeline</h1>
 
-      {/* cadence — one line */}
-      <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
-        <RefreshCw className="h-4 w-4 shrink-0 text-accent" />
-        <p className="truncate">
-          <span className="font-medium text-foreground">Re-runs daily</span>
-          <span className="text-muted"> · ~150 new HVAC signals/month (~2,000/yr) — a renewable supply, not a one-off list.</span>
-        </p>
-      </div>
-
-      {/* funnel */}
-      <div className="mt-4 flex flex-wrap items-stretch gap-2">
+      {/* one row: monthly opportunity rate + the per-run funnel */}
+      <div className="mt-4 flex flex-wrap items-center gap-2.5">
+        <div className="rounded-2xl border border-accent/40 bg-accent/10 px-5 py-3 text-center">
+          <p className="text-2xl font-semibold tracking-tight text-accent">~150<span className="align-top text-sm font-medium">/mo</span></p>
+          <p className="mt-0.5 text-[11px] text-muted">new opportunities · ~2,000/yr</p>
+        </div>
+        <span className="mx-1 hidden h-11 w-px bg-card-border sm:block" />
         {FUNNEL.map((f, i) => (
           <div key={f.l} className="flex items-center gap-2">
-            <div className="rounded-2xl border border-card-border bg-card px-5 py-3 text-center">
-              <p className="text-2xl font-semibold tracking-tight">{f.n}</p>
+            <div className="rounded-2xl border border-card-border bg-card px-4 py-3 text-center">
+              <p className="text-xl font-semibold tracking-tight">{f.n}</p>
               <p className="mt-0.5 text-[11px] text-muted">{f.l}</p>
             </div>
             {i < FUNNEL.length - 1 && <ArrowRight className="h-4 w-4 shrink-0 text-muted" />}
           </div>
         ))}
+        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted"><RefreshCw className="h-3.5 w-3.5 text-accent" /> re-runs daily</span>
       </div>
 
       {/* node flow */}
