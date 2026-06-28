@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Phone, Mail, Radio, Sparkles, CalendarCheck, Activity, User, BadgeCheck } from "lucide-react";
+import { Phone, Mail, Radio, Sparkles, CalendarCheck, Activity, User, BadgeCheck, RotateCcw, PhoneOff } from "lucide-react";
 import { AppShell } from "@/components/Shell";
 import {
   loadLeads, persistLeads, scriptFor, emailDraft, BOOKED_SLOT, AGENT_NAME,
@@ -145,6 +145,17 @@ export default function OutreachPage() {
     patch(l.id, { status: "completed", outcome: "emailed", summary: `Emailed — ${d.subject}` });
   }
 
+  // cancel a finished lead's outcome (booking/callback/email) and place a fresh call
+  function recall(l: Lead) {
+    patch(l.id, { bookedFor: undefined, email: undefined, vapiId: undefined });
+    call({ ...l, status: "queued", outcome: "pending", bookedFor: undefined, email: undefined, vapiId: undefined });
+  }
+  // just reset to queued without calling
+  function reset(l: Lead) {
+    setDraft(null);
+    patch(l.id, { status: "queued", outcome: "pending", summary: "Added to outreach.", bookedFor: undefined, email: undefined, vapiId: undefined, transcript: [], durationSec: 0 });
+  }
+
   const sel = leads.find((c) => c.id === selId) || null;
 
   return (
@@ -193,17 +204,32 @@ export default function OutreachPage() {
               {/* decision-maker contact */}
               <ContactCard l={sel} />
 
-              {/* actions for a queued lead */}
-              {sel.status === "queued" && (
-                <div className="mt-5 flex gap-2">
-                  <button onClick={() => call(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
-                    <Phone className="h-4 w-4" /> Call
+              {/* actions: queued → Call/Email · live → Cancel · finished → Call again */}
+              <div className="mt-5 flex gap-2">
+                {sel.status === "queued" ? (
+                  <>
+                    <button onClick={() => call(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                      <Phone className="h-4 w-4" /> Call
+                    </button>
+                    <button onClick={() => email(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold transition hover:border-accent">
+                      <Mail className="h-4 w-4" /> Email
+                    </button>
+                  </>
+                ) : sel.status === "dialing" || sel.status === "in_progress" ? (
+                  <button onClick={() => reset(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold text-muted transition hover:border-accent hover:text-foreground">
+                    <PhoneOff className="h-4 w-4" /> Cancel call
                   </button>
-                  <button onClick={() => email(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold transition hover:border-accent">
-                    <Mail className="h-4 w-4" /> Email
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <>
+                    <button onClick={() => recall(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                      <RotateCcw className="h-4 w-4" /> Call again
+                    </button>
+                    <button onClick={() => email(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold transition hover:border-accent">
+                      <Mail className="h-4 w-4" /> Email
+                    </button>
+                  </>
+                )}
+              </div>
 
               {/* timeline */}
               <div className="mt-6 space-y-5">
