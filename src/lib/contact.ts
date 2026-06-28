@@ -10,11 +10,12 @@
 // the Google Calendar invite is sent straight to that address. So the email
 // field fills in from the call, not from a stored list.
 
+// The number the live demo call actually dials (your demo phone), NOT the owner's
+// real number. Display the real owner phone in the UI; this is only the dial target.
 export const DEMO_PHONE = "+1 (415) 506-2042";
 
 export type Contact = {
   role: string;                       // who the decision-maker is
-  phone: string;                      // reachable number (demo line for the live call)
   verified: "email" | "phone" | null; // what the waterfall actually validated
   note: string;                       // short status line for the UI
 };
@@ -34,8 +35,8 @@ export function deriveContact(o: { segment?: string; confidence?: string }): Con
   const role = contactRole(o.segment);
   const c = (o.confidence || "").toUpperCase();
   if (c.startsWith("HIGH"))
-    return { role, phone: DEMO_PHONE, verified: "email", note: "Verified email on file" };
+    return { role, verified: "email", note: "Verified email on file" };
   if (c.startsWith("MED"))
-    return { role, phone: DEMO_PHONE, verified: "phone", note: "Direct phone found · verify on the call" };
-  return { role, phone: DEMO_PHONE, verified: null, note: "Email captured live on the call" };
+    return { role, verified: "phone", note: "Direct phone found · verify on the call" };
+  return { role, verified: null, note: "Contact captured on the call" };
 }

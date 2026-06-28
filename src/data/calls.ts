@@ -31,9 +31,9 @@ export type Lead = {
   vapiId?: string;
 };
 
-const DEMO_PHONE = "+1 (415) 506-2042";
+type OppIn = Opp & { score?: number; segment?: string; phone?: string; email?: string; confidence?: string };
 
-function base(o: Opp & { score?: number; segment?: string }) {
+function base(o: OppIn) {
   return {
     id: `lead_${(o.address || "x").replace(/\s+/g, "_")}_${Date.now()}`,
     address: o.address,
@@ -43,8 +43,9 @@ function base(o: Opp & { score?: number; segment?: string }) {
     systemAge: o.systemAge || "",
     why: o.why || "",
     estValue: estimateValue({ segment: o.segment, score: o.score, systemAge: o.systemAge }),
-    phone: DEMO_PHONE,
-    confidence: (o as { confidence?: string }).confidence || "",
+    phone: o.phone || "", // real enriched owner number when present; the live call dials the demo line separately
+    email: o.email || undefined, // real enriched email when present; otherwise captured on the call
+    confidence: o.confidence || "",
     addedAt: "Just now",
     durationSec: 0,
     bookedFor: undefined as string | undefined,
@@ -52,10 +53,10 @@ function base(o: Opp & { score?: number; segment?: string }) {
   };
 }
 
-export function makeQueued(o: Opp & { score?: number; segment?: string }): Lead {
+export function makeQueued(o: OppIn): Lead {
   return { ...base(o), status: "queued", outcome: "pending", summary: "Added to outreach." };
 }
-export function makeDialing(o: Opp & { score?: number; segment?: string }): Lead {
+export function makeDialing(o: OppIn): Lead {
   return { ...base(o), status: "dialing", outcome: "pending", summary: "Dialing…" };
 }
 
@@ -86,7 +87,7 @@ export const seedLeads: Lead[] = [
     systemAge: "16",
     why: "Commercial repair lead: 888 Ofarrell St has an OPEN 311 habitability complaint (landlord legally on the hook today).",
     estValue: estimateValue({ segment: "commercial-repair", score: 73, systemAge: "16" }),
-    phone: DEMO_PHONE,
+    phone: "+1 (415) 519-6210",
     confidence: "HIGH (validated email)",
     addedAt: "Today, 9:15 AM",
     durationSec: 64,
@@ -123,7 +124,7 @@ export function persistLeads(all: Lead[]) {
 }
 
 // add a lead from the map; returns false if already queued
-export function queueLead(o: Opp & { score?: number; segment?: string }): boolean {
+export function queueLead(o: OppIn): boolean {
   if (typeof window === "undefined") return false;
   try {
     const raw = window.localStorage.getItem(KEY);

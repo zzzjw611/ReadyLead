@@ -8,7 +8,7 @@ import {
   type Lead,
 } from "@/data/calls";
 import { fmtValue } from "@/lib/estimate";
-import { deriveContact } from "@/lib/contact";
+import { deriveContact, DEMO_PHONE } from "@/lib/contact";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -243,7 +243,10 @@ function ContactCard({ l }: { l: Lead }) {
       </div>
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Field icon={<User className="h-3.5 w-3.5" />} label="Role" value={c.role} />
-        <Field icon={<Phone className="h-3.5 w-3.5" />} label="Phone" value={l.phone} sub="demo line" />
+        <Field icon={<Phone className="h-3.5 w-3.5" />} label="Phone"
+          value={l.phone || "Captured on the call"}
+          sub={l.phone ? "owner direct" : undefined}
+          muted={!l.phone} />
         <Field icon={<Mail className="h-3.5 w-3.5" />} label="Email"
           value={l.email || (booked ? "—" : "captured on the call")}
           sub={l.email ? (booked ? "invite sent" : undefined) : undefined}
@@ -253,6 +256,7 @@ function ContactCard({ l }: { l: Lead }) {
         <p className="mt-3 flex items-center gap-1.5 text-xs text-positive"><CalendarCheck className="h-3.5 w-3.5" /> Calendar invite sent to {l.email}</p>
       )}
       {!booked && <p className="mt-3 text-xs text-muted">{c.note}</p>}
+      <p className="mt-1 text-[11px] text-muted/70">Demo: the live AI call rings {DEMO_PHONE}, not the owner.</p>
     </div>
   );
 }
