@@ -102,8 +102,8 @@ export default function OutreachPage() {
     polling.current.add(vapiId);
     let misses = 0; // consecutive bad/empty responses → give up rather than spin forever
     try {
-      for (let i = 0; i < 200 && mounted.current; i++) {
-        await delay(2500);
+      for (let i = 0; i < 320 && mounted.current; i++) {
+        await delay(1200); // snappier live transcript (Vapi REST gives finalized lines)
         try {
           const d = await fetch(`/api/vapi-call?id=${vapiId}`).then((r) => r.json());
           if (!d || !d.status) { // error payload or expired id
@@ -115,7 +115,7 @@ export default function OutreachPage() {
           patch(id, (c) => ({
             status: ended ? "completed" : d.status === "in-progress" ? "in_progress" : "dialing",
             transcript: (d.messages?.length ? d.messages : c.transcript) as Lead["transcript"],
-            durationSec: c.durationSec + 3,
+            durationSec: c.durationSec + 1,
           }));
           if (ended) {
             const sd = d.structuredData || {};
