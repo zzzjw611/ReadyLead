@@ -65,6 +65,7 @@ export default function SignalsPage() {
       L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
       mapRef.current = map;
       layerRef.current = L.layerGroup().addTo(map);
+      map.on("click", () => setSel(null)); // clicking empty map (not a dot) deselects the focused case
       setReady(true);
       // A flex/grid container often gets its real height AFTER the map inits; re-measure.
       const fix = () => { try { if (map && map._container) map.invalidateSize(false); } catch { /* ignore */ } };
@@ -90,15 +91,18 @@ export default function SignalsPage() {
     const L = (window as any).L;
     layerRef.current.clearLayers();
     byAddr.current = {};
-    for (const p of filtered) {
+    // When a case is focused, show only its dot; the rest disappear until it's closed.
+    const shown = sel ? [sel] : filtered;
+    for (const p of shown) {
       const col = categoryColor(p.segment);
-      const m = L.circleMarker([p.lat, p.lng], { radius: 7, color: col, weight: 1, fillColor: col, fillOpacity: 0.9 });
-      m.on("click", () => pick(p)); // clicking a dot recenters + zooms too, same as the list
+      const focused = !!sel;
+      const m = L.circleMarker([p.lat, p.lng], { radius: focused ? 9 : 7, color: col, weight: focused ? 2 : 1, fillColor: col, fillOpacity: 0.9 });
+      m.on("click", (e: any) => { L.DomEvent.stopPropagation(e); pick(p); }); // stop bubbling so the map's deselect-on-empty-click doesn't fire; recenters + zooms like the list
       m.addTo(layerRef.current);
       byAddr.current[p.address] = m;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, filtered]);
+  }, [ready, filtered, sel]);
 
   function pick(o: MapOpportunity) {
     setSel(o);
@@ -116,19 +120,7 @@ export default function SignalsPage() {
     <AppShell>
       <h1 className="mb-5 text-2xl font-semibold tracking-tight">Signals</h1>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div>
-          <div className="relative overflow-hidden rounded-2xl border border-card-border">
-            <div ref={mapEl} className="h-[66vh] min-h-[440px] w-full" style={{ zIndex: 0 }} />
-            <div className={`absolute inset-y-0 left-0 z-[1000] w-[330px] max-w-[86%] p-3 transition-transform duration-300 ${sel ? "translate-x-0" : "-translate-x-[115%]"}`}>
-              {sel && <Detail o={sel} added={added.has(sel.address)} onClose={() => setSel(null)} onAdd={() => add(sel)} onGo={() => router.push("/calls")} />}
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted">
-            {CATEGORY_ORDER.map((k) => <Dot key={k} c={CATEGORY_META[k].color} t={CATEGORY_META[k].label} />)}
-          </div>
-        </div>
-
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <aside>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <Select label="Category" value={cat} onChange={(v) => { setCat(v); if (v !== "311") setProb(""); }}
@@ -160,6 +152,18 @@ export default function SignalsPage() {
             {filtered.length === 0 && <p className="px-1 py-6 text-sm text-muted">No opportunities match these filters.</p>}
           </div>
         </aside>
+
+        <div>
+          <div className="relative overflow-hidden rounded-2xl border border-card-border">
+            <div ref={mapEl} className="h-[66vh] min-h-[440px] w-full" style={{ zIndex: 0 }} />
+            <div className={`absolute inset-y-0 left-0 z-[1000] w-[330px] max-w-[86%] p-3 transition-transform duration-300 ${sel ? "translate-x-0" : "-translate-x-[115%]"}`}>
+              {sel && <Detail o={sel} added={added.has(sel.address)} onClose={() => setSel(null)} onAdd={() => add(sel)} onGo={() => router.push("/calls")} />}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted">
+            {CATEGORY_ORDER.map((k) => <Dot key={k} c={CATEGORY_META[k].color} t={CATEGORY_META[k].label} />)}
+          </div>
+        </div>
       </div>
     </AppShell>
   );
@@ -170,39 +174,50 @@ function Detail({ o, added, onClose, onAdd, onGo }: { o: MapOpportunity; added: 
   const col = categoryColor(o.segment);
   const contact = deriveContact(o);
   const real = realContact(o.address);
+  const why = o.why ? parseWhy(o.why) : null;
   return (
     <div className="flex h-full max-h-full flex-col overflow-auto rounded-xl border border-card-border bg-card shadow-xl">
       <div className="p-4">
         <div className="mb-2 flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: `${col}1a`, color: col }}>
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: `${col}1a`, color: col }}>
             <span className="h-2 w-2 rounded-full" style={{ background: col }} />
             {categoryLabel(o.segment)}
           </span>
           <button onClick={onClose} className="text-muted transition hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-base font-semibold leading-tight">{o.address}</h2>
-          <span className="shrink-0 rounded-md border border-card-border bg-background px-1.5 py-0.5 text-sm font-medium text-muted">{o.score}</span>
+          <h2 className="text-[15px] font-semibold leading-tight">{o.address}</h2>
+          <span className="shrink-0 rounded-md border border-card-border bg-background px-1.5 py-0.5 text-[13px] font-medium text-muted">{o.score}</span>
         </div>
-        <p className="mt-1 text-xs text-muted">{o.segment}{o.systemAge ? ` · ~${o.systemAge}yr system` : ""}</p>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
           <Box k="Est. value" v={`~${fmtValue(v)}`} />
           <Box k="Decision-maker" v={real.name || contact.role} />
           <Box k="Problem" v={o.signals ? (o.signals).replace(/,/g, ", ") : "—"} />
           <Box k="Contact" v={real.phone || real.email || (contact.verified === "email" ? "Verified email" : contact.verified === "phone" ? "Direct phone" : "On the call")} />
         </div>
-        {o.qualified && contact.verified && <p className="mt-2 text-xs text-positive">✓ {contact.note}</p>}
-        {o.why && <p className="mt-3 rounded-xl bg-background px-3 py-2.5 text-sm leading-relaxed text-foreground/80">{o.why}</p>}
+        {why && (
+          <div className="mt-3 rounded-xl bg-background px-3 py-2.5">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted">{why.heading}</div>
+            <ul className="mt-1.5 space-y-1.5">
+              {why.points.map((pt, i) => (
+                <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-foreground/80">
+                  <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-foreground/40" />
+                  <span>{pt}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="mt-auto border-t border-card-border p-3">
         {added ? (
-          <button onClick={onGo} className="flex w-full items-center justify-center gap-2 rounded-xl border border-positive/40 bg-positive/10 px-4 py-2.5 text-sm font-semibold text-positive">
+          <button onClick={onGo} className="flex w-full items-center justify-center gap-2 rounded-xl border border-positive/40 bg-positive/10 px-4 py-2.5 text-[13px] font-semibold text-positive">
             <Check className="h-4 w-4" /> Added — go to Outreach
           </button>
         ) : (
-          <button onClick={onAdd} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
+          <button onClick={onAdd} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[13px] font-semibold text-white transition hover:opacity-90">
             <Plus className="h-4 w-4" /> Add to Outreach
           </button>
         )}
@@ -223,8 +238,22 @@ function Select({ label, value, onChange, options, disabled }: { label: string; 
     </label>
   );
 }
+// Turn a free-text "why" into a small heading + bullet points.
+// Source format: "<lead type>: <ADDRESS> has <reason>, and <reason>. <reason>."
+function parseWhy(why: string): { heading: string; points: string[] } {
+  const colon = why.indexOf(":");
+  const heading = colon !== -1 ? why.slice(0, colon).trim() : "Why this lead";
+  let body = (colon !== -1 ? why.slice(colon + 1) : why).trim();
+  body = body.replace(/^.*?\bhas\s+/i, ""); // drop the redundant "ADDRESS has " prefix (address is already the title)
+  const points = body
+    .split(/(?:,\s+and\s+)|(?:\.\s+)/) // split on ", and " conjunctions and sentence breaks
+    .map((s) => s.replace(/\s*\.\s*$/, "").trim())
+    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
+  return { heading, points };
+}
 function Box({ k, v }: { k: string; v: string }) {
-  return <div className="rounded-lg border border-card-border bg-background px-3 py-2"><div className="text-[11px] text-muted">{k}</div><div className="mt-0.5 truncate text-sm">{v}</div></div>;
+  return <div className="rounded-lg border border-card-border bg-background px-3 py-2"><div className="text-[10px] text-muted">{k}</div><div className="mt-0.5 truncate text-[13px]">{v}</div></div>;
 }
 function Dot({ c, t }: { c: string; t: string }) {
   return <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full" style={{ background: c }} />{t}</span>;
