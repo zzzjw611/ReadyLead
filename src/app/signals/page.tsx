@@ -61,11 +61,7 @@ export default function SignalsPage() {
       if (cancelled) return;
       const el = mapEl.current as any;
       if (!el || el._leaflet_id) return; // a map already lives on this element
-      // Animations OFF: zoom/fade/flyTo run async RAF frames that project against the
-      // map pane; in dev (StrictMode re-mount / soft-nav) a frame can fire on a torn-down
-      // map and throw "Cannot read properties of undefined (reading 'x')". Instant moves
-      // have no async projection, so the error can't happen.
-      map = L.map(el, { scrollWheelZoom: true, attributionControl: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([37.773, -122.42], 13);
+      map = L.map(el, { scrollWheelZoom: true, attributionControl: false }).setView([37.773, -122.42], 13);
       L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
       mapRef.current = map;
       layerRef.current = L.layerGroup().addTo(map);
@@ -79,6 +75,9 @@ export default function SignalsPage() {
     return () => {
       cancelled = true;
       try { ro?.disconnect(); } catch { /* ignore */ }
+      // cancel any running pan/zoom animation BEFORE removing the map, so its async
+      // frame can't fire on a torn-down map and throw "reading 'x'". Keeps zoom smooth.
+      try { map?.stop(); } catch { /* ignore */ }
       try { map?.remove(); } catch { /* ignore */ }
       mapRef.current = null;
       layerRef.current = null;
@@ -105,9 +104,8 @@ export default function SignalsPage() {
     setSel(o);
     const map = mapRef.current;
     if (!map) return;
-    // instant recenter (no animation) — opening the detail is what matters, and an
-    // animated flyTo is the main source of the async "reading 'x'" crash.
-    try { if (map._container) { map.invalidateSize(false); map.setView([o.lat, o.lng], 15, { animate: false }); } } catch { /* ignore */ }
+    // smooth recenter; cleanup calls map.stop() so a pending frame can't crash on teardown
+    try { if (map._container) { map.invalidateSize(false); map.setView([o.lat, o.lng], 15, { animate: true }); } } catch { /* ignore */ }
   }
   function add(o: MapOpportunity) {
     queueLead(o);
