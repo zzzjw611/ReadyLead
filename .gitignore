@@ -13,3 +13,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 node_modules
+.gstack/
+
+# pipeline outputs (contain PII — never commit)
+pipeline/.venv/
+pipeline/out/
+pipeline/*.csv
+pipeline/*.json
