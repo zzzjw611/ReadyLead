@@ -100,13 +100,14 @@ export default function Home() {
             24-hour hackathon MVP · AI GTM for HVAC contractors
           </p>
           <h1 className="max-w-4xl text-5xl font-semibold tracking-tight text-foreground md:text-7xl">
-            Nara Labs finds contractor leads before buildings fail.
+            ReadyLead helps contractors find building maintenance leads before property managers request bids.
           </h1>
           <p className="mt-6 max-w-3xl text-xl leading-8 text-muted">
-            An AI signal engine that analyzes building age, permit history,
-            resident complaints, HOA notes, weather stress, plan-extracted
-            systems, and contact paths to surface likely HVAC maintenance
-            opportunities.
+            ReadyLead is an AI GTM platform for contractors. It analyzes
+            building age, HVAC permit history, resident complaints, HOA notes,
+            SF 311 no-heat complaints, weather stress, plan-extracted systems,
+            and contact paths to surface likely HVAC maintenance opportunities
+            before competitors are bidding.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -177,9 +178,9 @@ export default function Home() {
             From building signals to contractor outreach.
           </h2>
           <p className="mt-4 text-lg leading-8 text-muted">
-            Nara detects pre-failure demand signals, finds the best contact
-            path, matches qualified HVAC contractors, and drafts
-            evidence-backed outreach.
+            ReadyLead turns public maintenance signals, building risk
+            indicators, contact paths, and contractor matching into ranked,
+            evidence-backed sales opportunities.
           </p>
         </div>
         <div className="mt-8 grid gap-4 md:grid-cols-2">

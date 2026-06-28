@@ -100,7 +100,7 @@ Based on the building profile and available maintenance signals, ${building.name
 Could you route this to the person responsible for maintenance or vendor coordination?
 
 Best,
-${matchedContractor?.company ?? "Nara Labs"}`,
+${matchedContractor?.company ?? "ReadyLead"}`,
   };
 }
 

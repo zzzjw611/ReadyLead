@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nara Labs",
-  description: "An AI signal engine for HVAC contractor growth.",
+  title: "ReadyLead",
+  description:
+    "ReadyLead helps contractors find building maintenance leads before property managers request bids.",
 };
 
 export default function RootLayout({

@@ -11,7 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Building2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-semibold tracking-tight">Nara Labs</p>
+              <p className="font-semibold tracking-tight">ReadyLead</p>
               <p className="text-xs text-muted">HVAC GTM signal engine</p>
             </div>
           </Link>
