@@ -54,6 +54,7 @@ export default function SignalsPage() {
   useEffect(() => {
     let map: any = null;
     let cancelled = false;
+    let ro: ResizeObserver | null = null;
     (async () => {
       const L = await loadLeaflet();
       if (cancelled) return;
@@ -64,9 +65,17 @@ export default function SignalsPage() {
       mapRef.current = map;
       layerRef.current = L.layerGroup().addTo(map);
       setReady(true);
+      // A flex/grid container often gets its real height AFTER the map inits.
+      // Without this, Leaflet keeps a stale 0-size and projecting a click throws
+      // "Cannot read properties of undefined (reading 'x')". Re-measure on resize.
+      const fix = () => { try { map && map.invalidateSize(false); } catch { /* ignore */ } };
+      fix();
+      ro = new ResizeObserver(fix);
+      ro.observe(el);
     })();
     return () => {
       cancelled = true;
+      try { ro?.disconnect(); } catch { /* ignore */ }
       try { map?.remove(); } catch { /* ignore */ }
       mapRef.current = null;
       layerRef.current = null;
@@ -91,7 +100,11 @@ export default function SignalsPage() {
 
   function pick(o: MapOpportunity) {
     setSel(o);
-    mapRef.current?.flyTo([o.lat, o.lng], 15, { duration: 0.6 });
+    const map = mapRef.current;
+    if (!map) return;
+    // never let a map animation hiccup crash the page — opening the detail is what matters
+    try { map.invalidateSize(false); map.flyTo([o.lat, o.lng], 15, { duration: 0.6 }); }
+    catch { try { map.setView([o.lat, o.lng], 15, { animate: false }); } catch { /* ignore */ } }
   }
   function add(o: MapOpportunity) {
     queueLead(o);
