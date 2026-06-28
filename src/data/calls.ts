@@ -77,32 +77,11 @@ export function emailDraft(o: { address: string; signals?: string; why?: string 
 export const BOOKED_SLOT = BOOKING_SLOTS[0];
 export const AGENT_NAME = company.name;
 
-export const seedLeads: Lead[] = [
-  {
-    id: "seed_888ofarrell",
-    address: "888 OFARRELL ST",
-    segment: "commercial-repair",
-    score: 73,
-    signals: "no_heat",
-    systemAge: "16",
-    why: "Commercial repair lead: 888 Ofarrell St has an OPEN 311 habitability complaint (landlord legally on the hook today).",
-    estValue: estimateValue({ segment: "commercial-repair", score: 73, systemAge: "16" }),
-    phone: "", // real number comes from the enriched contacts overlay (NEXT_PUBLIC_CONTACTS_JSON)
-    confidence: "HIGH (validated email)",
-    addedAt: "Today, 9:15 AM",
-    durationSec: 64,
-    status: "completed",
-    outcome: "callback",
-    summary: "Reached front desk; property manager out. Calling back tomorrow AM.",
-    transcript: [
-      { speaker: "agent", text: "Hi, calling about an open no-heat complaint at 888 Ofarrell — is the property manager available?" },
-      { speaker: "owner", text: "She's out today, try tomorrow morning." },
-      { speaker: "agent", text: "Will do, thanks — I'll follow up tomorrow AM." },
-    ],
-  },
-];
+// Empty by default — the Outreach list starts clean and fills as you add leads
+// from the map (Signals page). No pre-baked demo leads.
+export const seedLeads: Lead[] = [];
 
-const KEY = "readylead_leads_v4"; // v4: leads no longer bake in the demo phone (real number shown instead)
+const KEY = "readylead_leads_v5"; // v5: cleared the old demo/test leads for a fresh outreach list (drops stale v4 data)
 
 export function loadLeads(): Lead[] {
   if (typeof window === "undefined") return seedLeads;
