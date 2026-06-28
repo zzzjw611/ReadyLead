@@ -8,7 +8,7 @@ import {
   type Lead,
 } from "@/data/calls";
 import { fmtValue } from "@/lib/estimate";
-import { deriveContact, DEMO_PHONE } from "@/lib/contact";
+import { deriveContact } from "@/lib/contact";
 import { realContact } from "@/lib/contactsData";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -304,8 +304,6 @@ function ContactCard({ l }: { l: Lead }) {
       {booked && email && (
         <p className="mt-3 flex items-center gap-1.5 text-xs text-positive"><CalendarCheck className="h-3.5 w-3.5" /> Calendar invite sent to {email}</p>
       )}
-      {!booked && <p className="mt-3 text-xs text-muted">{c.note}</p>}
-      <p className="mt-1 text-[11px] text-muted/70">Demo: the live AI call rings {DEMO_PHONE}, not the owner.</p>
     </div>
   );
 }

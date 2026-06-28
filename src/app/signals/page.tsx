@@ -61,15 +61,17 @@ export default function SignalsPage() {
       if (cancelled) return;
       const el = mapEl.current as any;
       if (!el || el._leaflet_id) return; // a map already lives on this element
-      map = L.map(el, { scrollWheelZoom: true, attributionControl: false }).setView([37.773, -122.42], 13);
+      // Animations OFF: zoom/fade/flyTo run async RAF frames that project against the
+      // map pane; in dev (StrictMode re-mount / soft-nav) a frame can fire on a torn-down
+      // map and throw "Cannot read properties of undefined (reading 'x')". Instant moves
+      // have no async projection, so the error can't happen.
+      map = L.map(el, { scrollWheelZoom: true, attributionControl: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([37.773, -122.42], 13);
       L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
       mapRef.current = map;
       layerRef.current = L.layerGroup().addTo(map);
       setReady(true);
-      // A flex/grid container often gets its real height AFTER the map inits.
-      // Without this, Leaflet keeps a stale 0-size and projecting a click throws
-      // "Cannot read properties of undefined (reading 'x')". Re-measure on resize.
-      const fix = () => { try { map && map.invalidateSize(false); } catch { /* ignore */ } };
+      // A flex/grid container often gets its real height AFTER the map inits; re-measure.
+      const fix = () => { try { if (map && map._container) map.invalidateSize(false); } catch { /* ignore */ } };
       fix();
       ro = new ResizeObserver(fix);
       ro.observe(el);
@@ -103,9 +105,9 @@ export default function SignalsPage() {
     setSel(o);
     const map = mapRef.current;
     if (!map) return;
-    // never let a map animation hiccup crash the page — opening the detail is what matters
-    try { map.invalidateSize(false); map.flyTo([o.lat, o.lng], 15, { duration: 0.6 }); }
-    catch { try { map.setView([o.lat, o.lng], 15, { animate: false }); } catch { /* ignore */ } }
+    // instant recenter (no animation) — opening the detail is what matters, and an
+    // animated flyTo is the main source of the async "reading 'x'" crash.
+    try { if (map._container) { map.invalidateSize(false); map.setView([o.lat, o.lng], 15, { animate: false }); } } catch { /* ignore */ }
   }
   function add(o: MapOpportunity) {
     queueLead(o);
