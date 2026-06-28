@@ -1,306 +1,239 @@
 import Link from "next/link";
 import {
-  ArrowRight,
-  Building2,
-  Database,
-  FileText,
-  Mail,
-  Route,
-  Sparkles,
-  Target,
-  ThermometerSun,
-  Wrench,
+  ArrowRight, Radio, FileText, Building2, ShieldCheck, Users, Sparkles,
+  PhoneCall, CalendarCheck, ThermometerSun, Clock, DollarSign, MapPin,
 } from "lucide-react";
 import { AppShell } from "@/components/Shell";
 import { Card } from "@/components/Card";
 
-const painCards = [
+// Real figures from the latest pipeline run (free public-data crawl + scoring).
+const STATS = {
+  scored: "11,578",      // SF buildings scored this run
+  live: "400",           // highest-signal opportunities on the map
+  qualified: "19",       // cleared the score>=70 gate into paid enrichment
+  pipeline: "$15.2M",    // sum of estimated deal value across the 400
+  median: "$22k",        // median estimated deal value
+  over50k: "33",         // opportunities estimated over $50k
+};
+
+// The pipeline the user sees on the map — crawl → score → gate → enrich → rationale → outreach.
+const PIPELINE = [
   {
-    title: "Reactive lead channels",
-    body: "Google Ads, Yelp, Angi, and referrals only appear after the customer already has a problem.",
+    icon: Radio, tag: "Crawl", cost: "free · public APIs",
+    title: "Pull every maintenance signal in SF",
+    body: "DataSF 311 cases (no-heat, mold, ventilation, hot-water), building permits, and DBI records — refreshed on a schedule.",
+    out: "11,578 buildings",
   },
   {
-    title: "No early demand signal",
-    body: "Contractors cannot see which buildings are likely to need maintenance soon.",
+    icon: ThermometerSun, tag: "Score", cost: "free",
+    title: "Multi-signal opportunity score",
+    body: "Repeat complaints, open/acute status, system age vs 15–20yr service life, and live permitted scope roll up into one score + a segment label.",
+    out: "ranked + segmented",
   },
   {
-    title: "Contact path is unclear",
-    body: "Even when a building looks promising, teams still need to find the right property manager, facility contact, or leasing office.",
+    icon: ShieldCheck, tag: "Gate", cost: "protects credits",
+    title: "Only score ≥ 70 passes",
+    body: "A hard threshold gate. We never spend enrichment credits on weak buildings — only the ones with real, repeated HVAC intent get through.",
+    out: "19 qualified",
+  },
+  {
+    icon: Users, tag: "Contact waterfall", cost: "paid · gated",
+    title: "Resolve the named decision-maker",
+    body: "DataSF business registration → Enformion skip-trace → LeadMagic email validation. LLCs resolve to an officer, then a person. Self-managed vs property-managed is inferred from the email domain.",
+    out: "verified phone + email",
+  },
+  {
+    icon: Sparkles, tag: "Rationale", cost: "LLM",
+    title: "Auto 'why it'll close'",
+    body: "Each qualified opportunity gets a one-line, evidence-backed reason a contractor can read before dialing — the signal, the age, the legal pressure.",
+    out: "1 line per lead",
+  },
+  {
+    icon: PhoneCall, tag: "Outreach", cost: "Vapi voice",
+    title: "AI agent books the inspection",
+    body: "The voice agent calls the owner, books a free 30-min inspection on Google Calendar with their email, and posts the win to Slack #new-hvac-lead.",
+    out: "booked + notified",
   },
 ];
 
-const agents = [
+const WHY = [
   {
-    title: "Signal Scoring Agent",
     icon: ThermometerSun,
-    body: "Scores maintenance opportunity using building age, permits, reviews, HOA notes, weather stress, and plan-extracted systems.",
+    title: "HVAC demand is event-driven",
+    body: "Nobody shops for a contractor until something breaks. A no-heat report, a mold/ventilation complaint, or a 15–20yr-old system are public events that fire before the owner starts calling around.",
   },
   {
-    title: "Contact Path Agent",
-    icon: Route,
-    body: "Ranks the best way to reach the decision maker: property website, leasing office, permit contact, management company, or LinkedIn path.",
+    icon: Users,
+    title: "It's a named owner, not a list",
+    body: "Every qualified building resolves to a reachable decision-maker. So outreach is 'this building, this problem, this owner, today' — not a cold blast.",
   },
   {
-    title: "Contractor Matching Agent",
-    icon: Wrench,
-    body: "Matches HVAC contractors by trade, service area, specialty, and building type.",
-  },
-  {
-    title: "Outreach Draft Agent",
-    icon: Mail,
-    body: "Generates cautious, evidence-backed outreach for contractor sales teams.",
-  },
-];
-
-const architecture = [
-  "Data Sources",
-  "Convex DB",
-  "Signal Scoring Agent",
-  "Contact Path Agent",
-  "Contractor Matching Agent",
-  "Outreach Draft Agent",
-  "Dashboard",
-];
-
-const demoSteps = [
-  "Open the Building Opportunity Board.",
-  "Review AI-ranked HVAC maintenance opportunities.",
-  "Open Mission Creek Residences.",
-  "Review evidence, contact path, matched contractors, and outreach draft.",
-  "Click “Add New HOA Signal.”",
-  "Watch the risk score jump from around 72 to 92.",
-  "See the building become a Hot opportunity and outreach update.",
-];
-
-const sponsors = [
-  {
-    name: "OpenAI",
-    body: "Signal reasoning and outreach drafting path.",
-  },
-  {
-    name: "Convex",
-    body: "Real-time database and dashboard re-ranking.",
-  },
-  {
-    name: "Orange Slice",
-    body: "Optional contact enrichment adapter with Orange Slice-style enrichment.",
-  },
-  {
-    name: "Cursor / Codex",
-    body: "Rapid full-stack development for the hackathon MVP.",
+    icon: Clock,
+    title: "Timing is the edge",
+    body: "An OPEN 311 habitability complaint means the landlord is legally on the hook right now. That's the moment a free inspection actually gets a yes.",
   },
 ];
 
 export default function Home() {
   return (
     <AppShell>
-      <section className="grid min-h-[76vh] items-center gap-10 py-8 lg:grid-cols-[1fr_26rem]">
+      {/* hero */}
+      <section className="grid min-h-[70vh] items-center gap-10 py-8 lg:grid-cols-[1.15fr_1fr]">
         <div>
-          <p className="mb-4 inline-flex rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-sm text-accent">
-            24-hour hackathon MVP · AI GTM for HVAC contractors
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-sm text-accent">
+            <MapPin className="h-3.5 w-3.5" /> HVAC GTM signal engine · San Francisco
           </p>
-          <h1 className="max-w-4xl text-5xl font-semibold tracking-tight text-foreground md:text-7xl">
-            ReadyLead helps contractors find building maintenance leads before property managers request bids.
+          <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-foreground md:text-6xl">
+            Find the buildings that need HVAC work — before the owner calls anyone.
           </h1>
-          <p className="mt-6 max-w-3xl text-xl leading-8 text-muted">
-            ReadyLead is an AI GTM platform for contractors. It analyzes
-            building age, HVAC permit history, resident complaints, HOA notes,
-            SF 311 no-heat complaints, weather stress, plan-extracted systems,
-            and contact paths to surface likely HVAC maintenance opportunities
-            before competitors are bidding.
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
+            ReadyLead crawls SF&apos;s public maintenance records, scores every building for HVAC
+            intent, enriches the decision-maker for the ones that clear the bar, and lets an
+            AI voice agent book the inspection. All from signals a contractor can&apos;t see anywhere else.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-medium text-white transition hover:bg-orange-600"
-            >
-              Open Demo Dashboard
-              <ArrowRight className="h-4 w-4" />
+            <Link href="/signals" className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-medium text-white transition hover:opacity-90">
+              See the live opportunities <ArrowRight className="h-4 w-4" />
             </Link>
-            <a
-              href="#how-it-works"
-              className="inline-flex items-center gap-2 rounded-full border border-card-border px-6 py-3 font-medium text-muted transition hover:border-accent hover:text-foreground"
-            >
-              View Demo Flow
+            <a href="#pipeline" className="inline-flex items-center gap-2 rounded-full border border-card-border px-6 py-3 font-medium text-muted transition hover:border-accent hover:text-foreground">
+              How it works
             </a>
           </div>
         </div>
 
-        <Card className="bg-card/70">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-            <Target className="h-6 w-6" />
+        <Card className="bg-card/80">
+          <p className="text-sm uppercase tracking-[0.2em] text-muted">Every run</p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <Stat n={STATS.scored} l="buildings scored" />
+            <Stat n={STATS.live} l="live opportunities" accent />
+            <Stat n={STATS.pipeline} l="est. pipeline value" />
+            <Stat n={STATS.qualified} l="cleared the gate" />
           </div>
-          <p className="text-sm uppercase tracking-[0.2em] text-muted">Demo moment</p>
-          <p className="mt-3 text-2xl font-semibold leading-8">
-            Add one HOA signal and watch Mission Creek become a Hot opportunity.
+          <p className="mt-4 flex items-center gap-2 text-xs text-muted">
+            <DollarSign className="h-3.5 w-3.5" /> median deal {STATS.median} · {STATS.over50k} over $50k · refreshes daily
           </p>
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-card-border bg-background/60 p-4">
-              <p className="text-sm text-muted">Before</p>
-              <p className="mt-1 text-4xl font-semibold">72</p>
-            </div>
-            <div className="rounded-xl border border-accent/40 bg-accent/10 p-4">
-              <p className="text-sm text-accent">After</p>
-              <p className="mt-1 text-4xl font-semibold">92</p>
-            </div>
-          </div>
         </Card>
       </section>
 
-      <section className="py-14">
+      {/* pipeline */}
+      <section id="pipeline" className="py-14">
         <div className="max-w-3xl">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">
-            Problem
-          </p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">The pipeline</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-            Contractors buy expensive reactive leads after something breaks.
+            Crawl → score → gate → enrich → call.
           </h2>
           <p className="mt-4 text-lg leading-8 text-muted">
-            By then, every competitor is bidding.
+            The crawl and scoring are free and run on public data, so we can look at the whole city.
+            Paid enrichment only ever touches buildings that already proved repeated HVAC intent.
           </p>
         </div>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {painCards.map((card) => (
-            <Card key={card.title}>
-              <h3 className="text-lg font-semibold">{card.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-muted">{card.body}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <section className="py-14">
-        <div className="max-w-3xl">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">
-            Solution
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-            From building signals to contractor outreach.
-          </h2>
-          <p className="mt-4 text-lg leading-8 text-muted">
-            ReadyLead turns public maintenance signals, building risk
-            indicators, contact paths, and contractor matching into ranked,
-            evidence-backed sales opportunities.
-          </p>
-        </div>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {agents.map((agent) => {
-            const Icon = agent.icon;
-
+        <div className="mt-8 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {PIPELINE.map((s, i) => {
+            const Icon = s.icon;
             return (
-              <Card key={agent.title}>
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                  <Icon className="h-5 w-5" />
+              <Card key={s.title} className="relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-xs font-medium text-muted">{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <h3 className="text-xl font-semibold">{agent.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-muted">{agent.body}</p>
+                <div className="mt-4 flex items-center gap-2">
+                  <h3 className="font-semibold">{s.tag}</h3>
+                  <span className="rounded-full border border-card-border px-2 py-0.5 text-[10px] text-muted">{s.cost}</span>
+                </div>
+                <p className="mt-1 text-sm font-medium text-foreground/90">{s.title}</p>
+                <p className="mt-2 text-sm leading-6 text-muted">{s.body}</p>
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-background/60 px-2.5 py-1 text-xs text-accent">
+                  <ArrowRight className="h-3 w-3" /> {s.out}
+                </p>
               </Card>
             );
           })}
         </div>
       </section>
 
+      {/* why it works */}
       <section className="py-14">
-        <div className="mb-8 max-w-3xl">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">
-            Architecture
-          </p>
+        <div className="max-w-3xl">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">Why public signals find HVAC buyers</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-            A simple agent pipeline built for a live demo.
+            The city tells you who&apos;s about to need a contractor.
           </h2>
         </div>
-        <div className="grid gap-3 md:grid-cols-7">
-          {architecture.map((step, index) => (
-            <div key={step} className="relative">
-              <div className="rounded-2xl border border-card-border bg-card/90 p-4 text-center">
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-background text-accent">
-                  {index === 0 ? (
-                    <FileText className="h-5 w-5" />
-                  ) : index === 1 ? (
-                    <Database className="h-5 w-5" />
-                  ) : index === 6 ? (
-                    <Building2 className="h-5 w-5" />
-                  ) : (
-                    <Sparkles className="h-5 w-5" />
-                  )}
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {WHY.map((w) => {
+            const Icon = w.icon;
+            return (
+              <Card key={w.title}>
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                  <Icon className="h-5 w-5" />
                 </div>
-                <p className="text-sm font-medium">{step}</p>
-              </div>
-              {index < architecture.length - 1 ? (
-                <div className="hidden md:block absolute -right-2 top-1/2 h-px w-4 bg-card-border" />
-              ) : null}
-            </div>
-          ))}
+                <h3 className="text-lg font-semibold">{w.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-muted">{w.body}</p>
+              </Card>
+            );
+          })}
         </div>
       </section>
 
-      <section id="how-it-works" className="py-14">
-        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">
-              Live demo flow
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-              Show the GTM workflow in under a minute.
-            </h2>
-          </div>
-          <Card>
-            <ol className="space-y-4">
-              {demoSteps.map((step, index) => (
-                <li key={step} className="flex gap-4">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-semibold text-accent">
-                    {index + 1}
-                  </span>
-                  <p className="pt-1 text-sm leading-6 text-muted">{step}</p>
-                </li>
-              ))}
-            </ol>
-          </Card>
-        </div>
-      </section>
-
+      {/* volume / is this enough */}
       <section className="py-14">
-        <div className="mb-8 max-w-3xl">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">
-            Sponsor / tech stack
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-            Practical sponsor usage, without overclaiming.
-          </h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-4">
-          {sponsors.map((sponsor) => (
-            <Card key={sponsor.name}>
-              <h3 className="text-lg font-semibold">{sponsor.name}</h3>
-              <p className="mt-3 text-sm leading-6 text-muted">{sponsor.body}</p>
-            </Card>
-          ))}
-        </div>
+        <Card className="border-accent/20 bg-card/80">
+          <div className="grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">Is the volume enough to run a business on?</p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
+                One city, refreshed daily, already fills a contractor&apos;s calendar.
+              </h2>
+              <p className="mt-4 text-sm leading-7 text-muted">
+                400 live opportunities in SF alone add up to {STATS.pipeline} of estimated pipeline,
+                with a median deal around {STATS.median} and {STATS.over50k} jobs over $50k. Because the
+                crawl is free and runs daily, there&apos;s always fresh, high-intent inventory — and the
+                same engine drops onto any city with open 311 + permit data.
+              </p>
+              <Link href="/signals" className="mt-6 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-medium text-white transition hover:opacity-90">
+                Open the map <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Stat n={STATS.scored} l="buildings scored / run" big />
+              <Stat n={STATS.pipeline} l="estimated pipeline" big accent />
+              <Stat n={STATS.median} l="median deal value" big />
+              <Stat n={STATS.over50k} l="jobs over $50k" big />
+            </div>
+          </div>
+        </Card>
       </section>
 
+      {/* closing */}
       <section className="py-14">
         <Card className="border-accent/30 bg-accent/10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">
-                Hackathon scope
+              <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-[0.2em] text-accent">
+                <CalendarCheck className="h-4 w-4" /> Signal to booked inspection
               </p>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-                Hackathon MVP: uses fake but realistic building, signal, contact
-                path, and contractor data. The product performs signal-based
-                opportunity scoring, not guaranteed failure prediction.
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
+                Real data, real call, real calendar invite. Owner emails and phones are resolved by the
+                waterfall but kept out of this public repo — the live demo captures the email on the call.
               </p>
             </div>
-            <Link
-              href="/dashboard"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-medium text-white transition hover:bg-orange-600"
-            >
-              Open Demo Dashboard
-              <ArrowRight className="h-4 w-4" />
+            <Link href="/signals" className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-medium text-white transition hover:opacity-90">
+              Start the demo <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </Card>
       </section>
     </AppShell>
+  );
+}
+
+function Stat({ n, l, accent, big }: { n: string; l: string; accent?: boolean; big?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-4 ${accent ? "border-accent/40 bg-accent/10" : "border-card-border bg-background/60"}`}>
+      <p className={`font-semibold ${big ? "text-3xl" : "text-2xl"} ${accent ? "text-accent" : ""}`}>{n}</p>
+      <p className="mt-1 text-xs text-muted">{l}</p>
+    </div>
   );
 }

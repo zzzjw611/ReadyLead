@@ -46,7 +46,10 @@ export function systemPrompt(o: Opp): string {
     `You're calling the owner or property manager of ${o.address}.`,
     `Reason for the call: the building has ${signalPhrase(o)}.`,
     `Goal: book a free 30-minute on-site inspection. Be brief, warm, and professional — never pushy.`,
-    `Offer two time options. If they agree, confirm the time and say a written confirmation will follow by email.`,
+    `Offer two specific time options. When the owner picks a time, repeat the exact day and time back to confirm it, then ask for the best email for a written confirmation.`,
+    `Once the day/time and email are confirmed, use the Google Calendar tool to create a 30-minute event titled "${company.name} HVAC inspection — ${o.address}" at that time, with the owner's email as a guest.`,
+    `Then use the Slack tool to post a short note to the #new-hvac-lead channel, e.g. "✅ Booked HVAC inspection at ${o.address} for <day/time> — <email>".`,
+    `Once the calendar event and Slack note are done, give a one-sentence goodbye and END THE CALL immediately using the end-call function. This is an OUTBOUND call — never re-greet, never ask "how can I help you", never wait for more.`,
     `Services you can mention if asked: ${company.services.join(", ")}.`,
   ].join(" ");
 }

@@ -1,166 +1,222 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Phone, CalendarCheck, RotateCcw, Activity, Radio, Sparkles, FileText } from "lucide-react";
+import { Phone, Mail, Radio, Sparkles, CalendarCheck, Activity, User, BadgeCheck } from "lucide-react";
 import { AppShell } from "@/components/Shell";
 import {
-  loadCalls, persistCalls, makeCall, scriptFor, BOOKED_SLOT, AGENT_NAME,
-  type CallRecord,
+  loadLeads, persistLeads, scriptFor, emailDraft, BOOKED_SLOT, AGENT_NAME,
+  type Lead,
 } from "@/data/calls";
+import { fmtValue } from "@/lib/estimate";
+import { deriveContact } from "@/lib/contact";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function statusPill(c: CallRecord) {
-  if (c.status === "dialing") return { label: "Dialing…", cls: "text-amber-300 border-amber-500/40 bg-amber-500/10", pulse: true };
-  if (c.status === "in_progress") return { label: `On call · ${c.durationSec}s`, cls: "text-sky-300 border-sky-500/40 bg-sky-500/10", pulse: true };
-  if (c.outcome === "booked") return { label: "Booked", cls: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10", pulse: false };
-  if (c.outcome === "callback") return { label: "Callback", cls: "text-amber-300 border-amber-500/40 bg-amber-500/10", pulse: false };
-  return { label: "Done", cls: "text-slate-300 border-slate-500/40 bg-slate-500/10", pulse: false };
+function pill(l: Lead) {
+  if (l.status === "queued") return { t: "Queued", c: "text-muted border-card-border bg-background/40", pulse: false };
+  if (l.status === "dialing") return { t: "Dialing…", c: "text-accent border-accent/40 bg-accent-soft", pulse: true };
+  if (l.status === "in_progress") return { t: `On call · ${l.durationSec}s`, c: "text-accent border-accent/40 bg-accent-soft", pulse: true };
+  if (l.outcome === "booked") return { t: "Booked", c: "text-positive border-positive/40 bg-positive/10", pulse: false };
+  if (l.outcome === "emailed") return { t: "Emailed", c: "text-accent border-accent/40 bg-accent-soft", pulse: false };
+  if (l.outcome === "callback") return { t: "Callback", c: "text-muted border-card-border bg-background/40", pulse: false };
+  return { t: "Done", c: "text-muted border-card-border bg-background/40", pulse: false };
 }
 
-const PENDING_KEY = "readylead_pending_call";
-
-export default function CallsPage() {
-  const [calls, setCalls] = useState<CallRecord[]>([]);
+export default function OutreachPage() {
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ id: string; subject: string; body: string } | null>(null);
   const mounted = useRef(true);
-  const initDone = useRef(false);
-  const animating = useRef<Set<string>>(new Set());
+  const init = useRef(false);
+  const polling = useRef<Set<string>>(new Set());
 
-  function patch(id: string, p: Partial<CallRecord> | ((c: CallRecord) => Partial<CallRecord>)) {
-    setCalls((prev) => {
+  function patch(id: string, p: Partial<Lead> | ((c: Lead) => Partial<Lead>)) {
+    setLeads((prev) => {
       const next = prev.map((c) => (c.id === id ? { ...c, ...(typeof p === "function" ? p(c) : p) } : c));
-      persistCalls(next);
+      persistLeads(next);
       return next;
     });
   }
 
-  async function runAnim(rec: CallRecord) {
-    const turns = scriptFor({ address: rec.address, signals: rec.signals, systemAge: rec.systemAge, segment: rec.segment, why: rec.why });
-    await delay(1700); if (!mounted.current) return;
-    patch(rec.id, { status: "in_progress", summary: "Connected — agent speaking…" });
-    for (const t of turns) {
-      await delay(1300); if (!mounted.current) return;
-      patch(rec.id, (c) => ({ transcript: [...c.transcript, t], durationSec: c.durationSec + 14 }));
-    }
-    await delay(800); if (!mounted.current) return;
-    patch(rec.id, { status: "completed", outcome: "booked", bookedFor: BOOKED_SLOT, summary: `Reached the decision-maker — booked a free inspection ${BOOKED_SLOT}.` });
-  }
-
-  function startCall(o: { address: string; score?: number; segment?: string; signals?: string; systemAge?: string; why?: string }) {
-    const rec = makeCall(o);
-    setCalls((prev) => { const next = [rec, ...prev]; persistCalls(next); return next; });
-    setSelId(rec.id);
-  }
-
-  // init once: load existing + any pending call placed from the map
   useEffect(() => {
     mounted.current = true;
-    if (!initDone.current) {
-      initDone.current = true;
-      let loaded = loadCalls();
-      let sel = loaded[0]?.id ?? null;
-      try {
-        const raw = window.localStorage.getItem(PENDING_KEY);
-        if (raw) {
-          window.localStorage.removeItem(PENDING_KEY);
-          const rec = makeCall(JSON.parse(raw));
-          loaded = [rec, ...loaded];
-          persistCalls(loaded);
-          sel = rec.id;
-        }
-      } catch { /* ignore */ }
-      setCalls(loaded);
-      setSelId(sel);
-    }
-    return () => { mounted.current = false; };
-  }, []);
-
-  // drive the dialing animation for any call still in "dialing" (idempotent per id)
-  useEffect(() => {
-    for (const c of calls) {
-      if (c.status === "dialing" && !animating.current.has(c.id)) {
-        animating.current.add(c.id);
-        runAnim(c);
+    if (!init.current) {
+      init.current = true;
+      // unstick anything left mid-call when the user navigated away last time:
+      // a real Vapi call (has vapiId) → resume polling; a sim with no vapiId → reset to queued so it's retryable.
+      const loaded = loadLeads().map((l): Lead =>
+        (l.status === "dialing" || l.status === "in_progress") && !l.vapiId
+          ? { ...l, status: "queued", outcome: "pending", summary: "Added to outreach.", transcript: [], durationSec: 0 }
+          : l
+      );
+      setLeads(loaded);
+      persistLeads(loaded);
+      setSelId(loaded[0]?.id ?? null);
+      for (const l of loaded) {
+        if ((l.status === "dialing" || l.status === "in_progress") && l.vapiId) pollVapi(l.id, l.vapiId);
       }
     }
+    return () => { mounted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calls]);
+  }, []);
 
-  const sel = calls.find((c) => c.id === selId) || null;
-  const booked = calls.filter((c) => c.outcome === "booked").length;
+  // ── place a real Vapi outbound call (falls back to a scripted sim if Vapi isn't set up) ──
+  async function call(l: Lead) {
+    setDraft(null);
+    patch(l.id, { status: "dialing", outcome: "pending", summary: "Dialing the decision-maker…", transcript: [], durationSec: 0 });
+    try {
+      const res = await fetch("/api/vapi-call", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address: l.address, signals: l.signals, systemAge: l.systemAge, why: l.why }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.id) throw new Error(data.error || "vapi unavailable");
+      patch(l.id, { vapiId: data.id, summary: `Ringing ${data.phone || ""}… (live Vapi call)` });
+      pollVapi(l.id, data.id);
+    } catch {
+      patch(l.id, { summary: "Vapi unavailable — running a demo call" });
+      simulate(l.id); // no Vapi / error → clearly-labeled demo fallback
+    }
+  }
+
+  async function pollVapi(id: string, vapiId: string) {
+    if (polling.current.has(vapiId)) return; // already polling this call (e.g. resumed twice)
+    polling.current.add(vapiId);
+    let misses = 0; // consecutive bad/empty responses → give up rather than spin forever
+    try {
+      for (let i = 0; i < 200 && mounted.current; i++) {
+        await delay(2500);
+        try {
+          const d = await fetch(`/api/vapi-call?id=${vapiId}`).then((r) => r.json());
+          if (!d || !d.status) { // error payload or expired id
+            if (++misses >= 6) { patch(id, { status: "completed", outcome: "callback", summary: "Call ended (status unavailable)." }); return; }
+            continue;
+          }
+          misses = 0;
+          const ended = d.status === "ended";
+          patch(id, (c) => ({
+            status: ended ? "completed" : d.status === "in-progress" ? "in_progress" : "dialing",
+            transcript: (d.messages?.length ? d.messages : c.transcript) as Lead["transcript"],
+            durationSec: c.durationSec + 3,
+          }));
+          if (ended) {
+            const sd = d.structuredData || {};
+            const bo = String(sd.booking_outcome || ""); // assistant's field, e.g. "Booked for Monday, June 29 2026 8 PM"
+            const txt = `${d.summary || ""} ${bo} ${(d.messages || []).map((m: any) => m.text).join(" ")}`.toLowerCase();
+            const booked = typeof sd.booked === "boolean" ? sd.booked : (/^booked|booked for/i.test(bo) || /book|schedul|inspect|set up|come by/.test(txt));
+            // the REAL agreed time, from either field
+            const when = (sd.datetime as string) || (bo ? bo.replace(/^booked\s*(for)?\s*/i, "").trim() : "") || BOOKED_SLOT;
+            const email = (sd.email as string) || bo.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] || undefined;
+            patch(id, {
+              outcome: booked ? "booked" : "callback",
+              bookedFor: booked ? when : undefined,
+              email,
+              summary: d.summary || (booked ? `Booked an inspection — ${when}.` : "Call completed."),
+            });
+            return;
+          }
+        } catch { if (++misses >= 8) return; /* else keep polling through transient errors */ }
+      }
+    } finally {
+      polling.current.delete(vapiId);
+    }
+  }
+
+  async function simulate(id: string) {
+    const l = leads.find((x) => x.id === id);
+    const turns = scriptFor({ address: l?.address || "", signals: l?.signals, systemAge: l?.systemAge, why: l?.why });
+    await delay(1600); if (!mounted.current) return;
+    patch(id, { status: "in_progress", summary: "Connected — agent speaking…" });
+    for (const t of turns) { await delay(1300); if (!mounted.current) return; patch(id, (c) => ({ transcript: [...c.transcript, t], durationSec: c.durationSec + 14 })); }
+    await delay(700); if (!mounted.current) return;
+    patch(id, { status: "completed", outcome: "booked", bookedFor: BOOKED_SLOT, summary: `Reached the decision-maker — booked a free inspection ${BOOKED_SLOT}.` });
+  }
+
+  function email(l: Lead) {
+    const d = emailDraft(l);
+    setDraft({ id: l.id, ...d });
+    patch(l.id, { status: "completed", outcome: "emailed", summary: `Emailed — ${d.subject}` });
+  }
+
+  const sel = leads.find((c) => c.id === selId) || null;
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white"><Phone className="h-5 w-5" /></div>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Calls</h1>
-          <p className="text-sm text-muted">{calls.length} voice-agent calls · <span className="text-emerald-300">{booked} inspections booked</span></p>
-        </div>
-      </div>
+      <h1 className="mb-5 text-2xl font-semibold tracking-tight">Outreach</h1>
 
-      <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
-        {/* leads / calls list */}
+      <div className="grid gap-5 lg:grid-cols-[290px_1fr]">
+        {/* leads */}
         <aside className="space-y-2">
-          {calls.map((c) => {
-            const p = statusPill(c);
-            const active = c.id === selId;
+          {leads.length === 0 && <p className="rounded-xl border border-card-border bg-card p-4 text-sm text-muted">No leads yet. Add some from <a href="/signals" className="text-accent">Signals</a>.</p>}
+          {leads.map((c) => {
+            const p = pill(c); const active = c.id === selId;
             return (
-              <button key={c.id} onClick={() => setSelId(c.id)}
-                className={`block w-full rounded-xl border px-3 py-3 text-left transition ${active ? "border-accent bg-accent/10" : "border-card-border bg-card hover:border-accent/50"}`}>
+              <button key={c.id} onClick={() => { setSelId(c.id); setDraft(null); }}
+                className={`block w-full rounded-xl border px-3 py-3 text-left transition ${active ? "border-accent bg-accent-soft" : "border-card-border bg-card hover:border-accent/50"}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-medium">{c.address}</span>
-                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] ${p.cls}`}>
-                    {p.pulse && <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current align-middle" />}{p.label}
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] ${p.c}`}>
+                    {p.pulse && <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current align-middle" />}{p.t}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-                  <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-300">Hot {c.score}</span>
-                  <span className="truncate">{c.segment}</span>
+                <div className="mt-1.5 flex items-center gap-2 text-xs text-muted">
+                  <span className="rounded bg-accent-soft px-1.5 py-0.5 text-accent">{c.score}</span>
+                  <span>~{fmtValue(c.estValue)}</span>
+                  <span className="truncate">· {c.segment}</span>
                 </div>
               </button>
             );
           })}
         </aside>
 
-        {/* timeline detail */}
+        {/* detail */}
         <section>
           {!sel ? (
-            <div className="rounded-2xl border border-card-border bg-card p-8 text-center text-sm text-muted">
-              No calls yet. Open the <a href="/map" className="text-accent">map</a>, pick an opportunity, and hit Call.
-            </div>
+            <div className="rounded-2xl border border-card-border bg-card p-8 text-center text-sm text-muted">Pick a lead.</div>
           ) : (
             <div className="rounded-2xl border border-card-border bg-card p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl font-semibold tracking-tight">{sel.address}</h2>
-                  <p className="mt-0.5 text-sm text-muted">{sel.segment}{sel.systemAge ? ` · ~${sel.systemAge}yr system` : ""}</p>
+                  <h2 className="text-xl font-semibold tracking-tight">{sel.address}</h2>
+                  <p className="mt-0.5 text-sm text-muted">{sel.segment}{sel.systemAge ? ` · ~${sel.systemAge}yr system` : ""} · est. ~{fmtValue(sel.estValue)}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs text-red-300">Hot {sel.score}/100</span>
-                  <button onClick={() => startCall(sel)} className="flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition hover:opacity-90">
-                    <Phone className="h-3.5 w-3.5" /> Call now
+                <span className="rounded-md bg-accent-soft px-2.5 py-1 text-sm font-medium text-accent">{sel.score}</span>
+              </div>
+
+              {/* decision-maker contact */}
+              <ContactCard l={sel} />
+
+              {/* actions for a queued lead */}
+              {sel.status === "queued" && (
+                <div className="mt-5 flex gap-2">
+                  <button onClick={() => call(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                    <Phone className="h-4 w-4" /> Call
+                  </button>
+                  <button onClick={() => email(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold transition hover:border-accent">
+                    <Mail className="h-4 w-4" /> Email
                   </button>
                 </div>
-              </div>
+              )}
 
               {/* timeline */}
               <div className="mt-6 space-y-5">
-                <TimelineItem icon={<Radio className="h-4 w-4" />} title="Signal detected" tone="sky"
-                  meta={sel.signals ? `${sel.signals.replace(/,/g, ", ")}` : "building-system 311"}>
-                  <p className="text-sm text-foreground/80">DataSF 311 + permit signals flagged this building.</p>
-                </TimelineItem>
-
-                <TimelineItem icon={<Sparkles className="h-4 w-4" />} title="Scored by AI" tone="violet"
-                  meta={`Hot ${sel.score}/100`}>
-                  <p className="text-sm text-foreground/80">{sel.why || "High maintenance-opportunity score."}</p>
-                </TimelineItem>
-
-                <TimelineItem icon={<Phone className="h-4 w-4" />} title="AI follow-up call" tone="orange" last
-                  meta={`${sel.phone} · ${sel.durationSec ? `${sel.durationSec}s` : "—"}`}>
-                  <CallBody c={sel} />
-                </TimelineItem>
+                <Item icon={<Radio className="h-4 w-4" />} title="Signal detected" meta={sel.signals.replace(/,/g, ", ") || "311 / permit"}>
+                  <p className="text-sm text-foreground/75">DataSF 311 + permit signals flagged this building.</p>
+                </Item>
+                <Item icon={<Sparkles className="h-4 w-4" />} title="Scored by AI" meta={`${sel.score}/100`}>
+                  <p className="text-sm text-foreground/75">{sel.why || "High maintenance-opportunity score."}</p>
+                </Item>
+                <Item icon={sel.outcome === "emailed" ? <Mail className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                  title={sel.outcome === "emailed" ? "Email outreach" : "AI follow-up call"}
+                  meta={sel.status === "queued" ? "not started" : sel.outcome === "emailed" ? "sent" : `${sel.phone} · ${sel.durationSec ? sel.durationSec + "s" : "—"}`} last>
+                  {sel.status === "queued" ? (
+                    <p className="text-sm text-muted">Choose Call or Email above.</p>
+                  ) : sel.outcome === "emailed" ? (
+                    <EmailView draft={draft?.id === sel.id ? draft : { id: sel.id, ...emailDraft(sel) }} />
+                  ) : (
+                    <CallView l={sel} />
+                  )}
+                </Item>
               </div>
             </div>
           )}
@@ -170,48 +226,86 @@ export default function CallsPage() {
   );
 }
 
-function CallBody({ c }: { c: CallRecord }) {
+function ContactCard({ l }: { l: Lead }) {
+  const c = deriveContact(l);
+  const booked = l.outcome === "booked";
+  return (
+    <div className="mt-4 rounded-xl border border-card-border bg-background/40 p-4">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-2 text-sm font-medium"><User className="h-4 w-4 text-muted" /> Decision-maker</span>
+        {c.verified ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-positive/40 bg-positive/10 px-2 py-0.5 text-[11px] text-positive">
+            <BadgeCheck className="h-3 w-3" /> {c.verified === "email" ? "Verified email" : "Direct phone"}
+          </span>
+        ) : (
+          <span className="rounded-full border border-card-border px-2 py-0.5 text-[11px] text-muted">Lookup pending</span>
+        )}
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <Field icon={<User className="h-3.5 w-3.5" />} label="Role" value={c.role} />
+        <Field icon={<Phone className="h-3.5 w-3.5" />} label="Phone" value={l.phone} sub="demo line" />
+        <Field icon={<Mail className="h-3.5 w-3.5" />} label="Email"
+          value={l.email || (booked ? "—" : "captured on the call")}
+          sub={l.email ? (booked ? "invite sent" : undefined) : undefined}
+          muted={!l.email} />
+      </div>
+      {booked && l.email && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-positive"><CalendarCheck className="h-3.5 w-3.5" /> Calendar invite sent to {l.email}</p>
+      )}
+      {!booked && <p className="mt-3 text-xs text-muted">{c.note}</p>}
+    </div>
+  );
+}
+
+function Field({ icon, label, value, sub, muted }: { icon: React.ReactNode; label: string; value: string; sub?: string; muted?: boolean }) {
+  return (
+    <div className="rounded-lg border border-card-border bg-card px-3 py-2">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted">{icon} {label}</div>
+      <div className={`mt-0.5 truncate text-sm ${muted ? "text-muted" : "font-medium"}`}>{value}</div>
+      {sub && <div className="text-[10px] text-positive">{sub}</div>}
+    </div>
+  );
+}
+
+function CallView({ l }: { l: Lead }) {
   return (
     <div>
       <div className="mb-3 text-sm">
-        {c.status === "dialing" && <span className="flex items-center gap-2 text-amber-300"><Activity className="h-4 w-4 animate-pulse" /> Dialing {c.phone}…</span>}
-        {c.status === "in_progress" && <span className="flex items-center gap-2 text-sky-300"><Activity className="h-4 w-4 animate-pulse" /> Live call · {AGENT_NAME}</span>}
-        {c.status === "completed" && c.outcome === "booked" && <span className="flex items-center gap-2 text-emerald-300"><CalendarCheck className="h-4 w-4" /> Call completed · inspection booked {c.bookedFor}</span>}
-        {c.status === "completed" && c.outcome === "callback" && <span className="flex items-center gap-2 text-amber-300"><RotateCcw className="h-4 w-4" /> Call completed · callback</span>}
+        {l.status === "dialing" && <span className="flex items-center gap-2 text-accent"><Activity className="h-4 w-4 animate-pulse" /> {l.summary}</span>}
+        {l.status === "in_progress" && <span className="flex items-center gap-2 text-accent"><Activity className="h-4 w-4 animate-pulse" /> Live call · {AGENT_NAME}</span>}
+        {l.status === "completed" && l.outcome === "booked" && <span className="flex items-center gap-2 text-positive"><CalendarCheck className="h-4 w-4" /> Call completed · inspection booked {l.bookedFor}</span>}
+        {l.status === "completed" && l.outcome !== "booked" && <span className="text-muted">{l.summary}</span>}
       </div>
-      {c.transcript.length > 0 && (
+      {l.transcript.length > 0 && (
         <div className="space-y-2 rounded-xl bg-background/50 p-3">
-          {c.transcript.map((t, i) => (
+          {l.transcript.map((t, i) => (
             <div key={i} className="text-sm">
-              <span className={`mr-2 text-xs font-medium ${t.speaker === "agent" ? "text-accent" : "text-sky-300"}`}>
-                {t.speaker === "agent" ? AGENT_NAME : "Owner"}
-              </span>
+              <span className={`mr-2 text-xs font-medium ${t.speaker === "agent" ? "text-accent" : "text-foreground/60"}`}>{t.speaker === "agent" ? AGENT_NAME : "Owner"}</span>
               <span className="text-foreground/90">{t.text}</span>
             </div>
           ))}
         </div>
       )}
-      {c.transcript.length === 0 && c.status === "dialing" && <p className="text-sm text-muted">Connecting…</p>}
     </div>
   );
 }
 
-const TONE: Record<string, string> = {
-  sky: "border-sky-500/40 bg-sky-500/10 text-sky-300",
-  violet: "border-violet-500/40 bg-violet-500/10 text-violet-300",
-  orange: "border-accent/50 bg-accent/10 text-accent",
-};
+function EmailView({ draft }: { draft: { subject: string; body: string } }) {
+  return (
+    <div className="rounded-xl bg-background/50 p-3 text-sm">
+      <div className="mb-2 border-b border-card-border pb-2"><span className="text-xs text-muted">Subject</span><div className="font-medium">{draft.subject}</div></div>
+      <pre className="whitespace-pre-wrap font-sans text-foreground/85">{draft.body}</pre>
+    </div>
+  );
+}
 
-function TimelineItem({ icon, title, meta, tone, children, last }: { icon: React.ReactNode; title: string; meta?: string; tone: string; children: React.ReactNode; last?: boolean }) {
+function Item({ icon, title, meta, children, last }: { icon: React.ReactNode; title: string; meta?: string; children: React.ReactNode; last?: boolean }) {
   return (
     <div className="relative flex gap-4">
       {!last && <span className="absolute left-[15px] top-9 bottom-[-20px] w-px bg-card-border" />}
-      <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${TONE[tone]}`}>{icon}</span>
+      <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent">{icon}</span>
       <div className="flex-1 pb-1">
-        <div className="flex items-center gap-2">
-          <h3 className="font-medium">{title}</h3>
-          {meta && <span className="text-xs text-muted">· {meta}</span>}
-        </div>
+        <div className="flex items-center gap-2"><h3 className="font-medium">{title}</h3>{meta && <span className="text-xs text-muted">· {meta}</span>}</div>
         <div className="mt-1.5">{children}</div>
       </div>
     </div>

@@ -1,14 +1,15 @@
-// Call records for the Calls page (Signalsurf-style timeline).
-// New calls start in "dialing" and animate to completed; persisted to localStorage.
-// When real Vapi is wired, status/transcript come from the Vapi webhook instead.
+// Outreach records for the Outreach (/calls) page.
+// Leads are ADDED from the map (status "queued"), then you Call or Email each.
+// Real calls go through /api/vapi-call (Vapi); transcript comes back via polling.
 
 import { simulatedTranscript, company, BOOKING_SLOTS, type Opp } from "./voiceAgent";
+import { estimateValue } from "@/lib/estimate";
 
-export type CallStatus = "dialing" | "in_progress" | "completed" | "no_answer";
-export type CallOutcome = "booked" | "callback" | "not_interested" | "pending";
+export type CallStatus = "queued" | "dialing" | "in_progress" | "completed" | "no_answer";
+export type CallOutcome = "pending" | "booked" | "callback" | "not_interested" | "emailed";
 export type Turn = { speaker: "agent" | "owner"; text: string };
 
-export type CallRecord = {
+export type Lead = {
   id: string;
   address: string;
   segment: string;
@@ -16,57 +17,78 @@ export type CallRecord = {
   signals: string;
   systemAge: string;
   why: string;
+  estValue: number;
   phone: string;
-  startedAt: string;
+  confidence?: string;
+  addedAt: string;
   durationSec: number;
   status: CallStatus;
   outcome: CallOutcome;
   bookedFor?: string;
+  email?: string;
   summary: string;
   transcript: Turn[];
+  vapiId?: string;
 };
 
-// demo dial target — replaced by the real owner number once Vapi + enrichment are live
-const DEMO_PHONE = "+1 (415) 555-0142";
+const DEMO_PHONE = "+1 (415) 506-2042";
 
-export function makeCall(o: Opp & { score?: number; segment?: string }): CallRecord {
+function base(o: Opp & { score?: number; segment?: string }) {
   return {
-    id: `call_${(o.address || "x").replace(/\s+/g, "_")}_${Date.now()}`,
+    id: `lead_${(o.address || "x").replace(/\s+/g, "_")}_${Date.now()}`,
     address: o.address,
     segment: o.segment || "opportunity",
     score: o.score ?? 0,
     signals: o.signals || "",
     systemAge: o.systemAge || "",
     why: o.why || "",
+    estValue: estimateValue({ segment: o.segment, score: o.score, systemAge: o.systemAge }),
     phone: DEMO_PHONE,
-    startedAt: "Just now",
+    confidence: (o as { confidence?: string }).confidence || "",
+    addedAt: "Just now",
     durationSec: 0,
-    status: "dialing",
-    outcome: "pending",
-    summary: "Dialing the decision-maker…",
-    transcript: [],
+    bookedFor: undefined as string | undefined,
+    transcript: [] as Turn[],
   };
 }
 
-// the full scripted transcript the dialing animation reveals
+export function makeQueued(o: Opp & { score?: number; segment?: string }): Lead {
+  return { ...base(o), status: "queued", outcome: "pending", summary: "Added to outreach." };
+}
+export function makeDialing(o: Opp & { score?: number; segment?: string }): Lead {
+  return { ...base(o), status: "dialing", outcome: "pending", summary: "Dialing…" };
+}
+
 export function scriptFor(o: Opp): Turn[] {
   return simulatedTranscript(o);
+}
+
+export function emailDraft(o: { address: string; signals?: string; why?: string }) {
+  const subject = `Quick HVAC check for ${o.address}`;
+  const body =
+    `Hi,\n\nThis is Alex at ${company.name} — we do commercial HVAC in San Francisco. ` +
+    `We flagged ${o.address} from public maintenance signals${o.why ? ` (${o.why.toLowerCase()})` : ""}. ` +
+    `We offer a free 30-minute on-site inspection and can usually get a tech out same-week.\n\n` +
+    `Would Thursday or Friday work for a quick look?\n\nBest,\nAlex\n${company.name} · ${company.phone}`;
+  return { subject, body };
 }
 
 export const BOOKED_SLOT = BOOKING_SLOTS[0];
 export const AGENT_NAME = company.name;
 
-export const seedCalls: CallRecord[] = [
+export const seedLeads: Lead[] = [
   {
     id: "seed_888ofarrell",
     address: "888 OFARRELL ST",
     segment: "commercial-repair",
     score: 73,
     signals: "no_heat",
-    systemAge: "",
+    systemAge: "16",
     why: "Commercial repair lead: 888 Ofarrell St has an OPEN 311 habitability complaint (landlord legally on the hook today).",
-    phone: "+1 (415) 519-6210",
-    startedAt: "Today, 9:15 AM",
+    estValue: estimateValue({ segment: "commercial-repair", score: 73, systemAge: "16" }),
+    phone: DEMO_PHONE,
+    confidence: "HIGH (validated email)",
+    addedAt: "Today, 9:15 AM",
     durationSec: 64,
     status: "completed",
     outcome: "callback",
@@ -79,26 +101,43 @@ export const seedCalls: CallRecord[] = [
   },
 ];
 
-const KEY = "readylead_calls_v2";
+const KEY = "readylead_leads_v3";
 
-export function loadCalls(): CallRecord[] {
-  if (typeof window === "undefined") return seedCalls;
+export function loadLeads(): Lead[] {
+  if (typeof window === "undefined") return seedLeads;
   try {
     const raw = window.localStorage.getItem(KEY);
-    const mine: CallRecord[] = raw ? JSON.parse(raw) : [];
-    return [...mine, ...seedCalls];
+    const mine: Lead[] = raw ? JSON.parse(raw) : [];
+    return [...mine, ...seedLeads];
   } catch {
-    return seedCalls;
+    return seedLeads;
   }
 }
 
-export function persistCalls(mine: CallRecord[]) {
+export function persistLeads(all: Lead[]) {
   if (typeof window === "undefined") return;
   try {
-    // store only non-seed calls
-    const seedIds = new Set(seedCalls.map((s) => s.id));
-    window.localStorage.setItem(KEY, JSON.stringify(mine.filter((c) => !seedIds.has(c.id))));
-  } catch {
-    /* ignore */
-  }
+    const seedIds = new Set(seedLeads.map((s) => s.id));
+    window.localStorage.setItem(KEY, JSON.stringify(all.filter((c) => !seedIds.has(c.id))));
+  } catch { /* ignore */ }
+}
+
+// add a lead from the map; returns false if already queued
+export function queueLead(o: Opp & { score?: number; segment?: string }): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    const mine: Lead[] = raw ? JSON.parse(raw) : [];
+    if (mine.some((l) => l.address === o.address)) return false;
+    window.localStorage.setItem(KEY, JSON.stringify([makeQueued(o), ...mine]));
+    return true;
+  } catch { return false; }
+}
+
+export function queuedCount(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as Lead[]).length : 0;
+  } catch { return 0; }
 }

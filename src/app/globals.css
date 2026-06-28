@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #08090a;
-  --foreground: #f8fafc;
-  --muted: #94a3b8;
-  --card: #111318;
-  --card-border: #232833;
-  --accent: #f97316;
+  --background: #f5f6f8;   /* light page */
+  --foreground: #0f172a;   /* slate-900 text */
+  --muted: #64748b;        /* slate-500 */
+  --card: #ffffff;         /* white cards */
+  --card-border: #e6e8ec;  /* hairline */
+  --accent: #2563eb;       /* blue — primary action only */
+  --accent-soft: rgba(37, 99, 235, 0.10);
+  --positive: #16a34a;     /* booked / success */
 }
 
 @theme inline {
@@ -16,6 +18,8 @@
   --color-card: var(--card);
   --color-card-border: var(--card-border);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
 }
 
 body {
