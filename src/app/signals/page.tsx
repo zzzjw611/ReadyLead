@@ -7,6 +7,7 @@ import { AppShell } from "@/components/Shell";
 import { mapOpportunities, type MapOpportunity } from "@/data/mapOpportunities";
 import { estimateValue, fmtValue } from "@/lib/estimate";
 import { deriveContact } from "@/lib/contact";
+import { realContact } from "@/lib/contactsData";
 import { queueLead } from "@/data/calls";
 import {
   CATEGORY_META, CATEGORY_ORDER, category, categoryColor, categoryLabel,
@@ -168,6 +169,7 @@ function Detail({ o, added, onClose, onAdd, onGo }: { o: MapOpportunity; added: 
   const v = estimateValue({ segment: o.segment, score: o.score, systemAge: o.systemAge });
   const col = categoryColor(o.segment);
   const contact = deriveContact(o);
+  const real = realContact(o.address);
   return (
     <div className="flex h-full max-h-full flex-col overflow-auto rounded-xl border border-card-border bg-card shadow-xl">
       <div className="p-4">
@@ -186,9 +188,9 @@ function Detail({ o, added, onClose, onAdd, onGo }: { o: MapOpportunity; added: 
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
           <Box k="Est. value" v={`~${fmtValue(v)}`} />
-          <Box k="Decision-maker" v={contact.role} />
+          <Box k="Decision-maker" v={real.name || contact.role} />
           <Box k="Problem" v={o.signals ? (o.signals).replace(/,/g, ", ") : "—"} />
-          <Box k="Contact" v={contact.verified === "email" ? "Verified email" : contact.verified === "phone" ? "Direct phone" : "On the call"} />
+          <Box k="Contact" v={real.phone || real.email || (contact.verified === "email" ? "Verified email" : contact.verified === "phone" ? "Direct phone" : "On the call")} />
         </div>
         {o.qualified && contact.verified && <p className="mt-2 text-xs text-positive">✓ {contact.note}</p>}
         {o.why && <p className="mt-3 rounded-xl bg-background px-3 py-2.5 text-sm leading-relaxed text-foreground/80">{o.why}</p>}

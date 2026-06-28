@@ -9,6 +9,7 @@ import {
 } from "@/data/calls";
 import { fmtValue } from "@/lib/estimate";
 import { deriveContact, DEMO_PHONE } from "@/lib/contact";
+import { realContact } from "@/lib/contactsData";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -70,12 +71,18 @@ export default function OutreachPage() {
         body: JSON.stringify({ address: l.address, signals: l.signals, systemAge: l.systemAge, why: l.why }),
       });
       const data = await res.json();
-      if (!res.ok || !data.id) throw new Error(data.error || "vapi unavailable");
+      if (!res.ok || !data.id) {
+        // surface WHY the real call failed (e.g. Vapi daily limit) instead of a silent fake
+        const reason = data.error || data.detail?.message || `Vapi error (HTTP ${res.status})`;
+        patch(l.id, { summary: `⚠ Real call failed: ${reason} — showing a demo call instead.` });
+        simulate(l.id);
+        return;
+      }
       patch(l.id, { vapiId: data.id, summary: `Ringing ${data.phone || ""}… (live Vapi call)` });
       pollVapi(l.id, data.id);
-    } catch {
-      patch(l.id, { summary: "Vapi unavailable — running a demo call" });
-      simulate(l.id); // no Vapi / error → clearly-labeled demo fallback
+    } catch (e) {
+      patch(l.id, { summary: `⚠ Could not reach the call API (${(e as Error)?.message || "network"}) — demo call.` });
+      simulate(l.id); // network/parse error → clearly-labeled demo fallback
     }
   }
 
@@ -208,7 +215,7 @@ export default function OutreachPage() {
                 </Item>
                 <Item icon={sel.outcome === "emailed" ? <Mail className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
                   title={sel.outcome === "emailed" ? "Email outreach" : "AI follow-up call"}
-                  meta={sel.status === "queued" ? "not started" : sel.outcome === "emailed" ? "sent" : `${sel.phone} · ${sel.durationSec ? sel.durationSec + "s" : "—"}`} last>
+                  meta={sel.status === "queued" ? "not started" : sel.outcome === "emailed" ? "sent" : `${realContact(sel.address).phone || sel.phone || "—"} · ${sel.durationSec ? sel.durationSec + "s" : "—"}`} last>
                   {sel.status === "queued" ? (
                     <p className="text-sm text-muted">Choose Call or Email above.</p>
                   ) : sel.outcome === "emailed" ? (
@@ -228,11 +235,16 @@ export default function OutreachPage() {
 
 function ContactCard({ l }: { l: Lead }) {
   const c = deriveContact(l);
+  const real = realContact(l.address); // real enriched owner data (local-only, gitignored)
   const booked = l.outcome === "booked";
+  const phone = real.phone || l.phone;            // prefer the actual captured number
+  const email = real.email || l.email;            // prefer the actual captured email
   return (
     <div className="mt-4 rounded-xl border border-card-border bg-background/40 p-4">
       <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2 text-sm font-medium"><User className="h-4 w-4 text-muted" /> Decision-maker</span>
+        <span className="flex items-center gap-2 text-sm font-medium">
+          <User className="h-4 w-4 text-muted" /> {real.name || "Decision-maker"}
+        </span>
         {c.verified ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-positive/40 bg-positive/10 px-2 py-0.5 text-[11px] text-positive">
             <BadgeCheck className="h-3 w-3" /> {c.verified === "email" ? "Verified email" : "Direct phone"}
@@ -244,16 +256,16 @@ function ContactCard({ l }: { l: Lead }) {
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Field icon={<User className="h-3.5 w-3.5" />} label="Role" value={c.role} />
         <Field icon={<Phone className="h-3.5 w-3.5" />} label="Phone"
-          value={l.phone || "Captured on the call"}
-          sub={l.phone ? "owner direct" : undefined}
-          muted={!l.phone} />
+          value={phone || "Captured on the call"}
+          sub={phone ? "owner direct" : undefined}
+          muted={!phone} />
         <Field icon={<Mail className="h-3.5 w-3.5" />} label="Email"
-          value={l.email || (booked ? "—" : "captured on the call")}
-          sub={l.email ? (booked ? "invite sent" : undefined) : undefined}
-          muted={!l.email} />
+          value={email || (booked ? "—" : "captured on the call")}
+          sub={email ? (booked ? "invite sent" : "validated") : undefined}
+          muted={!email} />
       </div>
-      {booked && l.email && (
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-positive"><CalendarCheck className="h-3.5 w-3.5" /> Calendar invite sent to {l.email}</p>
+      {booked && email && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-positive"><CalendarCheck className="h-3.5 w-3.5" /> Calendar invite sent to {email}</p>
       )}
       {!booked && <p className="mt-3 text-xs text-muted">{c.note}</p>}
       <p className="mt-1 text-[11px] text-muted/70">Demo: the live AI call rings {DEMO_PHONE}, not the owner.</p>

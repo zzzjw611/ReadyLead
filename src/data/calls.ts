@@ -87,7 +87,7 @@ export const seedLeads: Lead[] = [
     systemAge: "16",
     why: "Commercial repair lead: 888 Ofarrell St has an OPEN 311 habitability complaint (landlord legally on the hook today).",
     estValue: estimateValue({ segment: "commercial-repair", score: 73, systemAge: "16" }),
-    phone: "+1 (415) 519-6210",
+    phone: "", // real number comes from the enriched contacts overlay (NEXT_PUBLIC_CONTACTS_JSON)
     confidence: "HIGH (validated email)",
     addedAt: "Today, 9:15 AM",
     durationSec: 64,
@@ -102,7 +102,7 @@ export const seedLeads: Lead[] = [
   },
 ];
 
-const KEY = "readylead_leads_v3";
+const KEY = "readylead_leads_v4"; // v4: leads no longer bake in the demo phone (real number shown instead)
 
 export function loadLeads(): Lead[] {
   if (typeof window === "undefined") return seedLeads;
