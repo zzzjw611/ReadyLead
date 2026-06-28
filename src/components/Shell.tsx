@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, MapPin } from "lucide-react";
+import { Building2, MapPin, Phone } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -21,6 +21,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-1.5 rounded-full border border-card-border px-4 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
             >
               <MapPin className="h-4 w-4" /> Map
+            </Link>
+            <Link
+              href="/calls"
+              className="flex items-center gap-1.5 rounded-full border border-card-border px-4 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
+            >
+              <Phone className="h-4 w-4" /> Calls
             </Link>
             <Link
               href="/dashboard"
