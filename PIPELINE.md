@@ -10,6 +10,10 @@ free / no key     free               free            Enformion + LeadMagic      
 The crawl and scoring are **free** and run on public data, so we can look at the whole city.
 Paid enrichment only ever touches the handful of buildings that already proved repeated HVAC intent.
 
+**Cadence (why it's sustainable):** the crawl re-runs on a schedule (daily) and re-scores the whole city each run.
+Roughly **~150 new HVAC signals land every month** (about 62 fresh 311 cases + 90 mechanical permits) — **~2,000 a year**.
+The numbers below are a per-run snapshot of a *renewable supply*, not a one-time list — the inventory keeps refilling on its own.
+
 ---
 
 ## 1. Crawl — find the list
@@ -22,6 +26,11 @@ Paid enrichment only ever touches the handful of buildings that already proved r
 | **Registered Business Locations** | `g8m3-pdis` | The **owner / landlord name** — the starting point for enrichment. (Assessor data has no owner names; business registration does.) |
 
 Addresses are normalized (street-suffix table + block/lot) to merge all three sources to one row per building.
+
+**The three map categories all come from DataSF** (two datasets):
+- **311 · active problem** ← 311 cases (`vw6y-z8j6`) — acute no-heat / hot-water / mold / ventilation complaints.
+- **Replacement candidate** ← permits (`i98e-djp9`) — last mechanical permit puts the system ≥ 15 yr old.
+- **Commercial project** ← permits (`i98e-djp9`) — a $1M+ mechanical project filed recently.
 
 ## 2. Score — multi-signal opportunity score
 **Self-written Python (free).** Score = intent × deal-value × timing.

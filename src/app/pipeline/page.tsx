@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Radio, Gauge, ShieldCheck, Network, Sparkles, PhoneCall,
   ArrowRight, ArrowDown, Check, User, Building2, MailCheck,
+  RefreshCw, AlertCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/Shell";
 
@@ -21,8 +22,13 @@ const STAGES: Stage[] = [
       { name: "DataSF Permits · i98e-djp9", url: "https://data.sfgov.org/d/i98e-djp9", domain: "data.sfgov.org" },
       { name: "Business Reg · g8m3-pdis", url: "https://data.sfgov.org/d/g8m3-pdis", domain: "data.sfgov.org" },
     ],
-    desc: "SoQL queries pull HVAC-need signals across the whole city — no-heat / hot-water / mold / ventilation 311 cases, mechanical permits for system age + live $1M+ projects, and the owner name from business registration.",
-    out: "11,578 buildings",
+    desc: "SoQL queries pull HVAC-need signals across the whole city. The three map categories all come from DataSF — two datasets:",
+    out: "~11,600 re-scored each run",
+    steps: [
+      { icon: AlertCircle, t: "311 · active problem", d: "DataSF 311 (vw6y-z8j6) — no-heat / hot-water / mold / vent" },
+      { icon: RefreshCw, t: "Replacement candidate", d: "DataSF Permits (i98e-djp9) — system ≥ 15 yr old" },
+      { icon: Building2, t: "Commercial project", d: "DataSF Permits (i98e-djp9) — $1M+ mechanical filed" },
+    ],
   },
   {
     key: "score", title: "Score", sub: "Multi-signal intent score", icon: Gauge, cost: "free", tone: "free",
@@ -71,10 +77,10 @@ const STAGES: Stage[] = [
 ];
 
 const FUNNEL = [
-  { n: "11,578", l: "scanned" },
-  { n: "400", l: "on the map" },
-  { n: "13", l: "cleared the gate" },
-  { n: "4", l: "reachable contact" },
+  { n: "~11,600", l: "re-scored / run" },
+  { n: "400", l: "live on the map" },
+  { n: "~13", l: "qualified / run" },
+  { n: "~4", l: "reachable contact" },
 ];
 
 const toneClass: Record<Stage["tone"], string> = {
@@ -119,6 +125,15 @@ export default function PipelinePage() {
         <Link href="/signals" className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">
           See the live opportunities <ArrowRight className="h-3.5 w-3.5" />
         </Link>
+      </div>
+
+      {/* cadence — the system is a renewable supply, not a one-off list */}
+      <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
+        <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+        <p className="leading-6">
+          <span className="font-medium text-foreground">Re-runs on a schedule (daily).</span>{" "}
+          <span className="text-muted">~150 new HVAC signals land every month (~2,000 / year) — about 62 fresh 311 cases + 90 mechanical permits. It&apos;s a renewable supply that keeps refilling, not a one-time list.</span>
+        </p>
       </div>
 
       {/* funnel */}
