@@ -69,12 +69,10 @@ function toContractor(doc: {
 function fallbackOutreach({
   building,
   row,
-  contactPath,
   contractor,
 }: {
   building: Building;
   row: (typeof sf311ContactRows)[number];
-  contactPath: ContactPath;
   contractor?: MatchedContractor;
 }) {
   const contractorName = contractor?.company ?? "Bay Area HVAC Pros";
@@ -227,7 +225,6 @@ export const importSF311DemoData = mutation({
         outreachDraft: fallbackOutreach({
           building,
           row,
-          contactPath: bestContactPath,
           contractor: matchedContractors[0],
         }),
         createdAt: now,
