@@ -7,9 +7,8 @@ const DEMO_PHONE = process.env.DEMO_PHONE || "+14155062042";
 const TOOL_IDS = ["31a71a29-63fa-4d68-a16c-74ff9117161d", "7368893b-f0d3-44db-b069-9514b6a03ed8"];
 
 function opener(o: { address?: string; signals?: string; systemAge?: string }) {
-  const sig = (o.signals || "").split(",")[0].replace(/_/g, " ").trim() || "building-system";
-  const age = o.systemAge ? ` on a system that's about ${o.systemAge} years old` : "";
-  return `Hi, this is Alex with Summit Mechanical — we do commercial HVAC in San Francisco. I'm calling about ${o.address}; I saw it had a recent ${sig} issue${age}, and we can take a quick look before it turns into a bigger repair. Do you have a second?`;
+  // Lead with identity/address verification — confirm the right person and building before pitching.
+  return `Hi, this is Alex with Summit Mechanical, a licensed HVAC contractor here in San Francisco. Quick check before I go on — am I speaking with the owner or property manager for ${o.address}?`;
 }
 
 // POST → place a real outbound Vapi call to the demo number
