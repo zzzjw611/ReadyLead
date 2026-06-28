@@ -31,9 +31,9 @@ export type Lead = {
   vapiId?: string;
 };
 
-const DEMO_PHONE = "+1 (415) 506-2042";
+type OppIn = Opp & { score?: number; segment?: string; phone?: string; email?: string; confidence?: string };
 
-function base(o: Opp & { score?: number; segment?: string }) {
+function base(o: OppIn) {
   return {
     id: `lead_${(o.address || "x").replace(/\s+/g, "_")}_${Date.now()}`,
     address: o.address,
@@ -43,8 +43,9 @@ function base(o: Opp & { score?: number; segment?: string }) {
     systemAge: o.systemAge || "",
     why: o.why || "",
     estValue: estimateValue({ segment: o.segment, score: o.score, systemAge: o.systemAge }),
-    phone: DEMO_PHONE,
-    confidence: (o as { confidence?: string }).confidence || "",
+    phone: o.phone || "", // real enriched owner number when present; the live call dials the demo line separately
+    email: o.email || undefined, // real enriched email when present; otherwise captured on the call
+    confidence: o.confidence || "",
     addedAt: "Just now",
     durationSec: 0,
     bookedFor: undefined as string | undefined,
@@ -52,10 +53,10 @@ function base(o: Opp & { score?: number; segment?: string }) {
   };
 }
 
-export function makeQueued(o: Opp & { score?: number; segment?: string }): Lead {
+export function makeQueued(o: OppIn): Lead {
   return { ...base(o), status: "queued", outcome: "pending", summary: "Added to outreach." };
 }
-export function makeDialing(o: Opp & { score?: number; segment?: string }): Lead {
+export function makeDialing(o: OppIn): Lead {
   return { ...base(o), status: "dialing", outcome: "pending", summary: "Dialing…" };
 }
 
@@ -76,32 +77,11 @@ export function emailDraft(o: { address: string; signals?: string; why?: string 
 export const BOOKED_SLOT = BOOKING_SLOTS[0];
 export const AGENT_NAME = company.name;
 
-export const seedLeads: Lead[] = [
-  {
-    id: "seed_888ofarrell",
-    address: "888 OFARRELL ST",
-    segment: "commercial-repair",
-    score: 73,
-    signals: "no_heat",
-    systemAge: "16",
-    why: "Commercial repair lead: 888 Ofarrell St has an OPEN 311 habitability complaint (landlord legally on the hook today).",
-    estValue: estimateValue({ segment: "commercial-repair", score: 73, systemAge: "16" }),
-    phone: DEMO_PHONE,
-    confidence: "HIGH (validated email)",
-    addedAt: "Today, 9:15 AM",
-    durationSec: 64,
-    status: "completed",
-    outcome: "callback",
-    summary: "Reached front desk; property manager out. Calling back tomorrow AM.",
-    transcript: [
-      { speaker: "agent", text: "Hi, calling about an open no-heat complaint at 888 Ofarrell — is the property manager available?" },
-      { speaker: "owner", text: "She's out today, try tomorrow morning." },
-      { speaker: "agent", text: "Will do, thanks — I'll follow up tomorrow AM." },
-    ],
-  },
-];
+// Empty by default — the Outreach list starts clean and fills as you add leads
+// from the map (Signals page). No pre-baked demo leads.
+export const seedLeads: Lead[] = [];
 
-const KEY = "readylead_leads_v3";
+const KEY = "readylead_leads_v5"; // v5: cleared the old demo/test leads for a fresh outreach list (drops stale v4 data)
 
 export function loadLeads(): Lead[] {
   if (typeof window === "undefined") return seedLeads;
@@ -123,7 +103,7 @@ export function persistLeads(all: Lead[]) {
 }
 
 // add a lead from the map; returns false if already queued
-export function queueLead(o: Opp & { score?: number; segment?: string }): boolean {
+export function queueLead(o: OppIn): boolean {
   if (typeof window === "undefined") return false;
   try {
     const raw = window.localStorage.getItem(KEY);

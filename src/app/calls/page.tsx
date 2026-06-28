@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Phone, Mail, Radio, Sparkles, CalendarCheck, Activity, User, BadgeCheck } from "lucide-react";
+import { Phone, Mail, Radio, Sparkles, CalendarCheck, Activity, User, BadgeCheck, RotateCcw, PhoneOff } from "lucide-react";
 import { AppShell } from "@/components/Shell";
 import {
   loadLeads, persistLeads, scriptFor, emailDraft, BOOKED_SLOT, AGENT_NAME,
@@ -9,6 +9,7 @@ import {
 } from "@/data/calls";
 import { fmtValue } from "@/lib/estimate";
 import { deriveContact } from "@/lib/contact";
+import { realContact } from "@/lib/contactsData";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -70,12 +71,29 @@ export default function OutreachPage() {
         body: JSON.stringify({ address: l.address, signals: l.signals, systemAge: l.systemAge, why: l.why }),
       });
       const data = await res.json();
-      if (!res.ok || !data.id) throw new Error(data.error || "vapi unavailable");
+      if (!res.ok || !data.id) {
+        const reason = data.error || data.detail?.message || `Vapi error (HTTP ${res.status})`;
+        if (res.status === 501) {
+          // Vapi isn't configured at all → scripted demo, clearly labeled (no real call possible)
+          patch(l.id, { summary: "Vapi not configured — running a scripted demo (not a real call)." });
+          simulate(l.id);
+        } else {
+          // Vapi IS configured but the call was blocked/failed → show the truth, never a fake booking
+          const isLimit = /daily|limit/i.test(reason);
+          patch(l.id, {
+            status: "completed", outcome: "callback", transcript: [], durationSec: 0, bookedFor: undefined,
+            summary: isLimit
+              ? "⚠ Real call blocked: Vapi daily outbound limit reached. It resets each day — or import a Twilio number into Vapi to remove the cap."
+              : `⚠ Real call failed: ${reason}`,
+          });
+        }
+        return;
+      }
       patch(l.id, { vapiId: data.id, summary: `Ringing ${data.phone || ""}… (live Vapi call)` });
       pollVapi(l.id, data.id);
-    } catch {
-      patch(l.id, { summary: "Vapi unavailable — running a demo call" });
-      simulate(l.id); // no Vapi / error → clearly-labeled demo fallback
+    } catch (e) {
+      // network/parse error reaching our own API → show it, don't fake a successful call
+      patch(l.id, { status: "completed", outcome: "callback", transcript: [], summary: `⚠ Couldn't reach the call API: ${(e as Error)?.message || "network error"}.` });
     }
   }
 
@@ -84,8 +102,8 @@ export default function OutreachPage() {
     polling.current.add(vapiId);
     let misses = 0; // consecutive bad/empty responses → give up rather than spin forever
     try {
-      for (let i = 0; i < 200 && mounted.current; i++) {
-        await delay(2500);
+      for (let i = 0; i < 320 && mounted.current; i++) {
+        await delay(1200); // snappier live transcript (Vapi REST gives finalized lines)
         try {
           const d = await fetch(`/api/vapi-call?id=${vapiId}`).then((r) => r.json());
           if (!d || !d.status) { // error payload or expired id
@@ -97,7 +115,7 @@ export default function OutreachPage() {
           patch(id, (c) => ({
             status: ended ? "completed" : d.status === "in-progress" ? "in_progress" : "dialing",
             transcript: (d.messages?.length ? d.messages : c.transcript) as Lead["transcript"],
-            durationSec: c.durationSec + 3,
+            durationSec: c.durationSec + 1,
           }));
           if (ended) {
             const sd = d.structuredData || {};
@@ -136,6 +154,17 @@ export default function OutreachPage() {
     const d = emailDraft(l);
     setDraft({ id: l.id, ...d });
     patch(l.id, { status: "completed", outcome: "emailed", summary: `Emailed — ${d.subject}` });
+  }
+
+  // cancel a finished lead's outcome (booking/callback/email) and place a fresh call
+  function recall(l: Lead) {
+    patch(l.id, { bookedFor: undefined, email: undefined, vapiId: undefined });
+    call({ ...l, status: "queued", outcome: "pending", bookedFor: undefined, email: undefined, vapiId: undefined });
+  }
+  // just reset to queued without calling
+  function reset(l: Lead) {
+    setDraft(null);
+    patch(l.id, { status: "queued", outcome: "pending", summary: "Added to outreach.", bookedFor: undefined, email: undefined, vapiId: undefined, transcript: [], durationSec: 0 });
   }
 
   const sel = leads.find((c) => c.id === selId) || null;
@@ -186,17 +215,32 @@ export default function OutreachPage() {
               {/* decision-maker contact */}
               <ContactCard l={sel} />
 
-              {/* actions for a queued lead */}
-              {sel.status === "queued" && (
-                <div className="mt-5 flex gap-2">
-                  <button onClick={() => call(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
-                    <Phone className="h-4 w-4" /> Call
+              {/* actions: queued → Call/Email · live → Cancel · finished → Call again */}
+              <div className="mt-5 flex gap-2">
+                {sel.status === "queued" ? (
+                  <>
+                    <button onClick={() => call(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                      <Phone className="h-4 w-4" /> Call
+                    </button>
+                    <button onClick={() => email(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold transition hover:border-accent">
+                      <Mail className="h-4 w-4" /> Email
+                    </button>
+                  </>
+                ) : sel.status === "dialing" || sel.status === "in_progress" ? (
+                  <button onClick={() => reset(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold text-muted transition hover:border-accent hover:text-foreground">
+                    <PhoneOff className="h-4 w-4" /> Cancel call
                   </button>
-                  <button onClick={() => email(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold transition hover:border-accent">
-                    <Mail className="h-4 w-4" /> Email
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <>
+                    <button onClick={() => recall(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                      <RotateCcw className="h-4 w-4" /> Call again
+                    </button>
+                    <button onClick={() => email(sel)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-card-border bg-background/40 px-4 py-3 text-sm font-semibold transition hover:border-accent">
+                      <Mail className="h-4 w-4" /> Email
+                    </button>
+                  </>
+                )}
+              </div>
 
               {/* timeline */}
               <div className="mt-6 space-y-5">
@@ -208,7 +252,7 @@ export default function OutreachPage() {
                 </Item>
                 <Item icon={sel.outcome === "emailed" ? <Mail className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
                   title={sel.outcome === "emailed" ? "Email outreach" : "AI follow-up call"}
-                  meta={sel.status === "queued" ? "not started" : sel.outcome === "emailed" ? "sent" : `${sel.phone} · ${sel.durationSec ? sel.durationSec + "s" : "—"}`} last>
+                  meta={sel.status === "queued" ? "not started" : sel.outcome === "emailed" ? "sent" : `${realContact(sel.address).phone || sel.phone || "—"} · ${sel.durationSec ? sel.durationSec + "s" : "—"}`} last>
                   {sel.status === "queued" ? (
                     <p className="text-sm text-muted">Choose Call or Email above.</p>
                   ) : sel.outcome === "emailed" ? (
@@ -228,11 +272,16 @@ export default function OutreachPage() {
 
 function ContactCard({ l }: { l: Lead }) {
   const c = deriveContact(l);
+  const real = realContact(l.address); // real enriched owner data (local-only, gitignored)
   const booked = l.outcome === "booked";
+  const phone = real.phone || l.phone;            // prefer the actual captured number
+  const email = real.email || l.email;            // prefer the actual captured email
   return (
     <div className="mt-4 rounded-xl border border-card-border bg-background/40 p-4">
       <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2 text-sm font-medium"><User className="h-4 w-4 text-muted" /> Decision-maker</span>
+        <span className="flex items-center gap-2 text-sm font-medium">
+          <User className="h-4 w-4 text-muted" /> {real.name || "Decision-maker"}
+        </span>
         {c.verified ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-positive/40 bg-positive/10 px-2 py-0.5 text-[11px] text-positive">
             <BadgeCheck className="h-3 w-3" /> {c.verified === "email" ? "Verified email" : "Direct phone"}
@@ -243,16 +292,18 @@ function ContactCard({ l }: { l: Lead }) {
       </div>
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Field icon={<User className="h-3.5 w-3.5" />} label="Role" value={c.role} />
-        <Field icon={<Phone className="h-3.5 w-3.5" />} label="Phone" value={l.phone} sub="demo line" />
+        <Field icon={<Phone className="h-3.5 w-3.5" />} label="Phone"
+          value={phone || "Captured on the call"}
+          sub={phone ? "owner direct" : undefined}
+          muted={!phone} />
         <Field icon={<Mail className="h-3.5 w-3.5" />} label="Email"
-          value={l.email || (booked ? "—" : "captured on the call")}
-          sub={l.email ? (booked ? "invite sent" : undefined) : undefined}
-          muted={!l.email} />
+          value={email || (booked ? "—" : "captured on the call")}
+          sub={email ? (booked ? "invite sent" : "validated") : undefined}
+          muted={!email} />
       </div>
-      {booked && l.email && (
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-positive"><CalendarCheck className="h-3.5 w-3.5" /> Calendar invite sent to {l.email}</p>
+      {booked && email && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-positive"><CalendarCheck className="h-3.5 w-3.5" /> Calendar invite sent to {email}</p>
       )}
-      {!booked && <p className="mt-3 text-xs text-muted">{c.note}</p>}
     </div>
   );
 }

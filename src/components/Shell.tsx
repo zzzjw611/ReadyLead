@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Radio, Send } from "lucide-react";
+import { Building2, Radio, Send, Workflow } from "lucide-react";
 
 const NAV = [
   { href: "/signals", label: "Signals", icon: Radio },
   { href: "/calls", label: "Outreach", icon: Send },
+  { href: "/pipeline", label: "Pipeline", icon: Workflow },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

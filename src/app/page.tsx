@@ -1,14 +1,15 @@
 import Link from "next/link";
 import {
   ArrowRight, Radio, FileText, Building2, ShieldCheck, Users, Sparkles,
-  PhoneCall, CalendarCheck, ThermometerSun, Clock, DollarSign, MapPin,
+  PhoneCall, CalendarCheck, ThermometerSun, Clock, RefreshCw, MapPin,
 } from "lucide-react";
 import { AppShell } from "@/components/Shell";
 import { Card } from "@/components/Card";
 
 // Real figures from the latest pipeline run (free public-data crawl + scoring).
 const STATS = {
-  scored: "11,578",      // SF buildings scored this run
+  inflow: "~150",        // new HVAC signals per month (62 311 + 90 permits) — ~2,000/yr
+  scored: "11,578",      // SF buildings re-scored each run
   live: "400",           // highest-signal opportunities on the map
   qualified: "19",       // cleared the score>=70 gate into paid enrichment
   pipeline: "$15.2M",    // sum of estimated deal value across the 400
@@ -102,15 +103,15 @@ export default function Home() {
         </div>
 
         <Card className="bg-card/80">
-          <p className="text-sm uppercase tracking-[0.2em] text-muted">Every run</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-muted">Re-scored daily</p>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <Stat n={STATS.scored} l="buildings scored" />
-            <Stat n={STATS.live} l="live opportunities" accent />
+            <Stat n={STATS.inflow} l="new signals / month" accent />
+            <Stat n={STATS.live} l="live opportunities" />
             <Stat n={STATS.pipeline} l="est. pipeline value" />
-            <Stat n={STATS.qualified} l="cleared the gate" />
+            <Stat n={STATS.qualified} l="cleared the gate / run" />
           </div>
           <p className="mt-4 flex items-center gap-2 text-xs text-muted">
-            <DollarSign className="h-3.5 w-3.5" /> median deal {STATS.median} · {STATS.over50k} over $50k · refreshes daily
+            <RefreshCw className="h-3.5 w-3.5" /> ~{STATS.scored} re-scored every run · ~2,000 fresh HVAC signals a year — a renewable supply
           </p>
         </Card>
       </section>
@@ -188,17 +189,17 @@ export default function Home() {
               </h2>
               <p className="mt-4 text-sm leading-7 text-muted">
                 400 live opportunities in SF alone add up to {STATS.pipeline} of estimated pipeline,
-                with a median deal around {STATS.median} and {STATS.over50k} jobs over $50k. Because the
-                crawl is free and runs daily, there&apos;s always fresh, high-intent inventory — and the
-                same engine drops onto any city with open 311 + permit data.
+                with a median deal around {STATS.median} and {STATS.over50k} jobs over $50k. And it doesn&apos;t run dry:
+                the crawl is free and re-runs daily, with ~150 new HVAC signals (~2,000 a year) flowing in —
+                a renewable supply, not a one-time list. The same engine drops onto any city with open 311 + permit data.
               </p>
               <Link href="/signals" className="mt-6 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-medium text-white transition hover:opacity-90">
                 Open the map <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Stat n={STATS.scored} l="buildings scored / run" big />
-              <Stat n={STATS.pipeline} l="estimated pipeline" big accent />
+              <Stat n={STATS.inflow} l="new signals / month" big accent />
+              <Stat n={STATS.pipeline} l="estimated pipeline" big />
               <Stat n={STATS.median} l="median deal value" big />
               <Stat n={STATS.over50k} l="jobs over $50k" big />
             </div>
