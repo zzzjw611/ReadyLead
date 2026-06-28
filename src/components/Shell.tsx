@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { Building2, MapPin } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -15,12 +15,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted">HVAC GTM signal engine</p>
             </div>
           </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-full border border-card-border px-4 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
-          >
-            Demo Dashboard
-          </Link>
+          <nav className="flex items-center gap-2">
+            <Link
+              href="/map"
+              className="flex items-center gap-1.5 rounded-full border border-card-border px-4 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
+            >
+              <MapPin className="h-4 w-4" /> Map
+            </Link>
+            <Link
+              href="/dashboard"
+              className="rounded-full border border-card-border px-4 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
+            >
+              Demo Dashboard
+            </Link>
+          </nav>
         </div>
       </header>
       <div className="mx-auto max-w-6xl px-6 py-10">{children}</div>
