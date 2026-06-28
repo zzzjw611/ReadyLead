@@ -93,7 +93,7 @@ export default function SignalsPage() {
     for (const p of filtered) {
       const col = categoryColor(p.segment);
       const m = L.circleMarker([p.lat, p.lng], { radius: 7, color: col, weight: 1, fillColor: col, fillOpacity: 0.9 });
-      m.on("click", () => setSel(p));
+      m.on("click", () => pick(p)); // clicking a dot recenters + zooms too, same as the list
       m.addTo(layerRef.current);
       byAddr.current[p.address] = m;
     }
