@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  ConvexProvider,
-  ConvexReactClient,
   useAction,
   useMutation,
   useQuery,
@@ -27,6 +25,7 @@ import {
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Card } from "@/components/Card";
+import { ConvexClientBoundary } from "@/components/ConvexClientBoundary";
 
 type Opportunity = {
   riskScore?: number;
@@ -717,26 +716,9 @@ function BuildingDetailContent({ buildingId }: { buildingId: Id<"buildings"> }) 
 }
 
 export function BuildingDetail({ buildingId }: { buildingId: string }) {
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-  const convex = useMemo(
-    () => (convexUrl ? new ConvexReactClient(convexUrl) : null),
-    [convexUrl],
-  );
-
-  if (!convex) {
-    return (
-      <Card>
-        <h1 className="text-2xl font-semibold">Convex is not configured</h1>
-        <p className="mt-2 text-sm text-muted">
-          Set `NEXT_PUBLIC_CONVEX_URL` after creating a Convex deployment, then reload this page.
-        </p>
-      </Card>
-    );
-  }
-
   return (
-    <ConvexProvider client={convex}>
+    <ConvexClientBoundary>
       <BuildingDetailContent buildingId={buildingId as Id<"buildings">} />
-    </ConvexProvider>
+    </ConvexClientBoundary>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ConvexProvider, ConvexReactClient, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   Building2,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Card } from "@/components/Card";
+import { ConvexClientBoundary } from "@/components/ConvexClientBoundary";
 
 type RiskLabel = "Hot" | "High" | "Medium" | "Low";
 
@@ -363,27 +364,9 @@ function OpportunityBoardContent() {
 }
 
 export function OpportunityBoard() {
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-  const convex = useMemo(
-    () => (convexUrl ? new ConvexReactClient(convexUrl) : null),
-    [convexUrl],
-  );
-
-  if (!convex) {
-    return (
-      <Card>
-        <h2 className="text-xl font-semibold">Convex is not configured</h2>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          Set `NEXT_PUBLIC_CONVEX_URL` after creating a Convex deployment, then
-          reload the dashboard.
-        </p>
-      </Card>
-    );
-  }
-
   return (
-    <ConvexProvider client={convex}>
+    <ConvexClientBoundary>
       <OpportunityBoardContent />
-    </ConvexProvider>
+    </ConvexClientBoundary>
   );
 }
