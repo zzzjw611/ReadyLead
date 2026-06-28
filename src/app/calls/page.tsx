@@ -72,17 +72,28 @@ export default function OutreachPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.id) {
-        // surface WHY the real call failed (e.g. Vapi daily limit) instead of a silent fake
         const reason = data.error || data.detail?.message || `Vapi error (HTTP ${res.status})`;
-        patch(l.id, { summary: `⚠ Real call failed: ${reason} — showing a demo call instead.` });
-        simulate(l.id);
+        if (res.status === 501) {
+          // Vapi isn't configured at all → scripted demo, clearly labeled (no real call possible)
+          patch(l.id, { summary: "Vapi not configured — running a scripted demo (not a real call)." });
+          simulate(l.id);
+        } else {
+          // Vapi IS configured but the call was blocked/failed → show the truth, never a fake booking
+          const isLimit = /daily|limit/i.test(reason);
+          patch(l.id, {
+            status: "completed", outcome: "callback", transcript: [], durationSec: 0, bookedFor: undefined,
+            summary: isLimit
+              ? "⚠ Real call blocked: Vapi daily outbound limit reached. It resets each day — or import a Twilio number into Vapi to remove the cap."
+              : `⚠ Real call failed: ${reason}`,
+          });
+        }
         return;
       }
       patch(l.id, { vapiId: data.id, summary: `Ringing ${data.phone || ""}… (live Vapi call)` });
       pollVapi(l.id, data.id);
     } catch (e) {
-      patch(l.id, { summary: `⚠ Could not reach the call API (${(e as Error)?.message || "network"}) — demo call.` });
-      simulate(l.id); // network/parse error → clearly-labeled demo fallback
+      // network/parse error reaching our own API → show it, don't fake a successful call
+      patch(l.id, { status: "completed", outcome: "callback", transcript: [], summary: `⚠ Couldn't reach the call API: ${(e as Error)?.message || "network error"}.` });
     }
   }
 
