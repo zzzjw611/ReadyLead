@@ -63,11 +63,11 @@ Then a **segment** tag: `commercial-project` (≥$1M), `commercial-repair` / `re
 
 | Stage | Platform / tool | Free? | Role |
 |---|---|---|---|
-| Crawl | **DataSF / Socrata** (`vw6y-z8j6`, `i98e-djp9`, `g8m3-pdis`) | ✅ | public data sources |
+| Crawl | [DataSF / Socrata](https://data.sfgov.org/) — [311 `vw6y-z8j6`](https://data.sfgov.org/d/vw6y-z8j6), [permits `i98e-djp9`](https://data.sfgov.org/d/i98e-djp9), [business reg `g8m3-pdis`](https://data.sfgov.org/d/g8m3-pdis) | ✅ | public data sources |
 | Score + gate | self-written Python | ✅ | multi-signal score, segment, score≥70 gate |
-| Enrich (orchestration) | **DeepLine** | paid | waterfall orchestration |
-| Enrich (skip-trace) | **Enformion** | paid | name→contact, LLC→officer→person |
-| Enrich (validation) | **LeadMagic** | paid | email validation |
-| Outreach (call) | **Vapi + Twilio** | paid | AI voice call |
-| Booking | **Google Calendar** (Vapi tool) | — | create the inspection event |
-| Notify | **Slack** (Vapi tool) | — | #new-hvac-lead |
+| Enrich (orchestration) | [DeepLine](https://code.deepline.com) | paid | waterfall orchestration |
+| Enrich (skip-trace) | [Enformion](https://www.enformion.com) | paid | name→contact, LLC→officer→person |
+| Enrich (validation) | [LeadMagic](https://leadmagic.io) | paid | email validation |
+| Outreach (call) | [Vapi](https://vapi.ai) + [Twilio](https://www.twilio.com) | paid | AI voice call |
+| Booking | [Google Calendar](https://calendar.google.com) (Vapi tool) | — | create the inspection event |
+| Notify | [Slack](https://slack.com) (Vapi tool) | — | #new-hvac-lead |

@@ -5,35 +5,44 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/Shell";
 
+type Plat = { name: string; url?: string; domain?: string };
 type Stage = {
   key: string; title: string; sub: string; icon: React.ElementType;
   cost: string; tone: "free" | "paid" | "soft";
-  platforms: string[]; desc: string; out: string;
+  platforms: Plat[]; desc: string; out: string;
   steps?: { icon: React.ElementType; t: string; d: string }[];
 };
 
 const STAGES: Stage[] = [
   {
     key: "crawl", title: "Crawl", sub: "Find the list", icon: Radio, cost: "free · no key", tone: "free",
-    platforms: ["DataSF 311 · vw6y-z8j6", "DataSF Permits · i98e-djp9", "Business Reg · g8m3-pdis"],
+    platforms: [
+      { name: "DataSF 311 · vw6y-z8j6", url: "https://data.sfgov.org/d/vw6y-z8j6", domain: "data.sfgov.org" },
+      { name: "DataSF Permits · i98e-djp9", url: "https://data.sfgov.org/d/i98e-djp9", domain: "data.sfgov.org" },
+      { name: "Business Reg · g8m3-pdis", url: "https://data.sfgov.org/d/g8m3-pdis", domain: "data.sfgov.org" },
+    ],
     desc: "SoQL queries pull HVAC-need signals across the whole city — no-heat / hot-water / mold / ventilation 311 cases, mechanical permits for system age + live $1M+ projects, and the owner name from business registration.",
     out: "11,578 buildings",
   },
   {
     key: "score", title: "Score", sub: "Multi-signal intent score", icon: Gauge, cost: "free", tone: "free",
-    platforms: ["Python · self-written"],
+    platforms: [{ name: "Python · self-written" }],
     desc: "Repeat complaints, OPEN / acute status, system age vs 15–20yr service life, and permitted scope roll into one score and a segment label.",
     out: "scored + segmented",
   },
   {
     key: "gate", title: "Gate", sub: "Protect the credits", icon: ShieldCheck, cost: "free", tone: "free",
-    platforms: ["threshold · score ≥ 70"],
+    platforms: [{ name: "threshold · score ≥ 70" }],
     desc: "A hard gate. Paid enrichment never touches a weak building — only repeated, real HVAC intent gets through. This is what lets us scan the whole city without burning money.",
     out: "~13 qualified",
   },
   {
     key: "enrich", title: "Enrich", sub: "Contact waterfall", icon: Network, cost: "paid · gated", tone: "paid",
-    platforms: ["DeepLine · orchestration", "Enformion · skip-trace", "LeadMagic · validation"],
+    platforms: [
+      { name: "DeepLine · orchestration", url: "https://code.deepline.com", domain: "deepline.com" },
+      { name: "Enformion · skip-trace", url: "https://www.enformion.com", domain: "enformion.com" },
+      { name: "LeadMagic · validation", url: "https://leadmagic.io", domain: "leadmagic.io" },
+    ],
     desc: "DeepLine runs a waterfall over only the qualified set to resolve the decision-maker:",
     out: "verified phone + email",
     steps: [
@@ -44,13 +53,18 @@ const STAGES: Stage[] = [
   },
   {
     key: "rationale", title: "Rationale", sub: "Why it'll close", icon: Sparkles, cost: "LLM", tone: "soft",
-    platforms: ["LLM"],
+    platforms: [{ name: "LLM" }],
     desc: "One evidence-backed line per opportunity — the signal, the system age, the legal pressure — so a rep can read it before dialing.",
     out: "1 line per lead",
   },
   {
     key: "outreach", title: "Outreach", sub: "Book the inspection", icon: PhoneCall, cost: "paid", tone: "paid",
-    platforms: ["Vapi + Twilio · voice", "Google Calendar", "Slack"],
+    platforms: [
+      { name: "Vapi · voice", url: "https://vapi.ai", domain: "vapi.ai" },
+      { name: "Twilio · number", url: "https://www.twilio.com", domain: "twilio.com" },
+      { name: "Google Calendar", url: "https://calendar.google.com", domain: "calendar.google.com" },
+      { name: "Slack", url: "https://slack.com", domain: "slack.com" },
+    ],
     desc: "The AI voice agent calls the owner, confirms person + address, introduces the company, books a free inspection on Google Calendar, and posts the win to Slack #new-hvac-lead.",
     out: "booked + notified",
   },
@@ -69,13 +83,38 @@ const toneClass: Record<Stage["tone"], string> = {
   soft: "border-card-border bg-background text-muted",
 };
 
+function favicon(domain: string) {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+}
+
+function Chip({ p }: { p: Plat }) {
+  const inner = (
+    <>
+      {p.domain && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={favicon(p.domain)} alt="" width={14} height={14} className="h-3.5 w-3.5 rounded-sm" />
+      )}
+      {p.name}
+    </>
+  );
+  const cls = "inline-flex items-center gap-1.5 rounded-lg border border-card-border bg-background px-2.5 py-1 text-xs text-foreground/80";
+  return p.url ? (
+    <a href={p.url} target="_blank" rel="noreferrer" className={`${cls} transition hover:border-accent hover:text-foreground`}>
+      {inner}
+      <ArrowRight className="h-3 w-3 -rotate-45 opacity-50" />
+    </a>
+  ) : (
+    <span className={cls}>{inner}</span>
+  );
+}
+
 export default function PipelinePage() {
   return (
     <AppShell>
       <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Pipeline</h1>
-          <p className="mt-1 text-sm text-muted">From a city of public records to a booked HVAC inspection.</p>
+          <p className="mt-1 text-sm text-muted">From a city of public records to a booked HVAC inspection. Every platform links out.</p>
         </div>
         <Link href="/signals" className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">
           See the live opportunities <ArrowRight className="h-3.5 w-3.5" />
@@ -120,9 +159,7 @@ export default function PipelinePage() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {s.platforms.map((p) => (
-                    <span key={p} className="rounded-lg border border-card-border bg-background px-2.5 py-1 text-xs text-foreground/80">{p}</span>
-                  ))}
+                  {s.platforms.map((p) => <Chip key={p.name} p={p} />)}
                 </div>
 
                 <p className="mt-3 text-sm leading-6 text-muted">{s.desc}</p>
