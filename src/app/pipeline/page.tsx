@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   Radio, Gauge, ShieldCheck, Network, Sparkles, PhoneCall,
-  ArrowRight, ArrowDown, Check, User, Building2, MailCheck,
+  ArrowRight, ArrowDown, User, Building2, MailCheck,
   RefreshCw, AlertCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/Shell";
@@ -202,15 +202,6 @@ export default function PipelinePage() {
         })}
       </div>
 
-      {/* footnote */}
-      <div className="mt-8 rounded-2xl border border-card-border bg-card/70 p-5">
-        <p className="flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-positive" /> Free where it scales, paid where it counts</p>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          The crawl and scoring are free and run on public data, so the funnel starts with the entire city.
-          Paid steps (enrichment, the live call) only ever run on the gated few that already proved repeated HVAC intent —
-          so coverage is city-wide while spend stays tiny. Full write-up in <span className="font-medium text-foreground/80">PIPELINE.md</span>.
-        </p>
-      </div>
     </AppShell>
   );
 }
